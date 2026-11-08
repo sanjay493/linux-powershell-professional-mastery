@@ -1,0 +1,171 @@
+# Validate content and scripts, build PDFs and the MkDocs site, deploy to GitHub Pages.
+# Uses GitHub's OIDC-based Pages deployment: no personal tokens or secrets are stored.
+name: Validate, build and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-linux:
+    name: Content + Linux scripts (Ubuntu 24.04)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Course completeness check
+        run: python tools/check_course.py
+
+      - name: Markdown lint
+        run: npx --yes markdownlint-cli2@0.18.1
+
+      - name: Bash syntax check and ShellCheck
+        run: |
+          shopt -s nullglob
+          for f in scripts/linux/*.sh; do bash -n "$f"; echo "syntax OK: $f"; done
+          shellcheck --version
+          shellcheck -S warning scripts/linux/*.sh
+
+      - name: Execute Linux scripts (read-only smoke test)
+        run: |
+          shopt -s nullglob
+          mkdir -p reports
+          for f in scripts/linux/*.sh; do
+            echo "::group::$f (no arguments)"
+            set +e; bash "$f"; rc=$?; set -e
+            echo "exit code: $rc"
+            if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then echo "::error::$f exited $rc"; exit 1; fi
+            bash "$f" -o reports >/dev/null || [ $? -eq 3 ]
+            echo "::endgroup::"
+          done
+          ls -l reports
+
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force -SkipPublisherCheck
+          $results = Invoke-ScriptAnalyzer -Path scripts/powershell -Recurse -Severity Error, Warning
+          $results | Format-Table Severity, RuleName, ScriptName, Line, Message -AutoSize -Wrap | Out-String -Width 200 | Write-Output
+          if ($results | Where-Object Severity -eq 'Error') { throw 'PSScriptAnalyzer reported errors.' }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-script-reports
+          path: reports/
+          if-no-files-found: ignore
+
+  validate-windows:
+    name: PowerShell scripts (Windows, 5.1 and 7)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Parse and execute with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($script in Get-ChildItem scripts/powershell -Filter *.ps1) {
+            $tokens = $null; $parseErrors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$parseErrors) | Out-Null
+            if ($parseErrors) { $parseErrors | Out-String | Write-Output; throw "Parse errors in $($script.Name)" }
+            Write-Output "::group::Windows PowerShell 5.1 - $($script.Name)"
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $script.FullName -OutputPath reports\ps51
+            if ($LASTEXITCODE -notin 0, 3) { throw "$($script.Name) exited $LASTEXITCODE" }
+            Write-Output '::endgroup::'
+          }
+
+      - name: Execute with PowerShell 7
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSVersionTable.PSVersion
+          foreach ($script in Get-ChildItem scripts/powershell -Filter *.ps1) {
+            Write-Output "::group::PowerShell 7 - $($script.Name)"
+            & pwsh -NoProfile -File $script.FullName -OutputPath reports\ps7
+            if ($LASTEXITCODE -notin 0, 3) { throw "$($script.Name) exited $LASTEXITCODE" }
+            Write-Output '::endgroup::'
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-script-reports
+          path: reports/
+          if-no-files-found: ignore
+
+  build:
+    name: Build PDFs and site
+    needs: [validate-linux, validate-windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install WeasyPrint system libraries and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Configure GitHub Pages
+        id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Build and validate PDFs
+        run: python tools/build_pdfs.py
+
+      - name: Build site (strict mode fails on broken links and nav problems)
+        env:
+          SITE_URL: ${{ steps.pages.outputs.base_url && format('{0}/', steps.pages.outputs.base_url) || 'http://localhost/' }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: mkdocs build --strict
+
+      - name: Upload PDFs as a build artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: course-pdfs
+          path: docs/downloads/pdf/
+
+      - name: Upload Pages artefact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

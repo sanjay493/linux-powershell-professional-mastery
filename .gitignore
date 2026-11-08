@@ -1,0 +1,33 @@
+# Python / MkDocs
+.venv/
+venv/
+__pycache__/
+*.pyc
+site/
+.cache/
+
+# Generated PDFs (built reproducibly in CI, never committed)
+docs/downloads/pdf/
+build/
+
+# Script run output
+reports/
+*.log
+
+# Secrets and local config — never commit
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*.pfx
+secrets.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp

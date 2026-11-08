@@ -1,0 +1,18 @@
+{
+  // Lenient rules suited to MkDocs Material syntax (admonitions, tabs, long tables).
+  "config": {
+    "default": true,
+    "MD013": false,
+    "MD024": { "siblings_only": true },
+    "MD033": false,
+    "MD041": false,
+    "MD046": false,
+    "MD007": { "indent": 4 },
+    "MD030": false,
+    "MD036": false,
+    "MD051": false,
+    "MD060": false
+  },
+  "globs": ["docs/**/*.md", "*.md"],
+  "ignores": ["node_modules/**", ".venv/**", "site/**"]
+}

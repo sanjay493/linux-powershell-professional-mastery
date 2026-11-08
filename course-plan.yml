@@ -1,0 +1,80 @@
+# Single source of truth for the 30-day curriculum and its release schedule.
+# The nightly content job (22:00 IST = 16:30 UTC) publishes the next two "planned" days,
+# then flips their status to "published". Do not reorder days.
+course: Linux & PowerShell Professional Mastery
+release:
+  cadence: 2 days per night
+  time_ist: "22:00"
+  time_utc: "16:30"
+  cron_utc: "30 16 * * *"
+
+modules:
+  - id: module-1
+    title: Command-Line Fundamentals
+    days: [1, 2, 3, 4, 5]
+  - id: module-2
+    title: System Administration
+    days: [6, 7, 8, 9, 10]
+  - id: module-3
+    title: Networking & Troubleshooting
+    days: [11, 12, 13, 14, 15]
+  - id: module-4
+    title: Security, Logs & Monitoring
+    days: [16, 17, 18, 19, 20]
+  - id: module-5
+    title: Scripting & Automation
+    days: [21, 22, 23, 24, 25]
+  - id: module-6
+    title: Professional Operations & Projects
+    days: [26, 27, 28, 29, 30]
+
+# extras: deliverables that ship together with that day (scripts, module tests, PDFs).
+days:
+  - {day: 1, module: module-1, release: 2026-11-08, status: published, title: "Introduction to Linux and PowerShell",
+     extras: ["scripts/linux/system-info.sh", "scripts/powershell/System-Info.ps1"]}
+  - {day: 2, module: module-1, release: 2026-11-08, status: published, title: "File and Directory Management"}
+  - {day: 3, module: module-1, release: 2026-11-08, status: planned, title: "Reading and Managing Files"}
+  - {day: 4, module: module-1, release: 2026-11-08, status: planned, title: "Searching Files and Text"}
+  - {day: 5, module: module-1, release: 2026-11-09, status: planned, title: "Command Help, History and Pipelines",
+     extras: ["docs/assessments/module-1-test.md"]}
+  - {day: 6, module: module-2, release: 2026-11-09, status: planned, title: "Users and Groups"}
+  - {day: 7, module: module-2, release: 2026-11-10, status: planned, title: "File Permissions and Access Control"}
+  - {day: 8, module: module-2, release: 2026-11-10, status: planned, title: "Processes and Services",
+     extras: ["scripts/linux/process-monitor.sh", "scripts/powershell/Process-Monitor.ps1"]}
+  - {day: 9, module: module-2, release: 2026-11-11, status: planned, title: "Disk and Storage Management",
+     extras: ["scripts/linux/disk-monitor.sh", "scripts/powershell/Disk-Monitor.ps1"]}
+  - {day: 10, module: module-2, release: 2026-11-11, status: planned, title: "Software and Package Management",
+     extras: ["docs/assessments/module-2-test.md"]}
+  - {day: 11, module: module-3, release: 2026-11-12, status: planned, title: "IP Configuration"}
+  - {day: 12, module: module-3, release: 2026-11-12, status: planned, title: "Connectivity Troubleshooting"}
+  - {day: 13, module: module-3, release: 2026-11-13, status: planned, title: "DNS Troubleshooting",
+     extras: ["scripts/linux/dns-check.sh", "scripts/powershell/DNS-Check.ps1"]}
+  - {day: 14, module: module-3, release: 2026-11-13, status: planned, title: "Ports, Sockets and Connections",
+     extras: ["scripts/linux/port-monitor.sh", "scripts/powershell/Port-Monitor.ps1"]}
+  - {day: 15, module: module-3, release: 2026-11-14, status: planned, title: "Network Interfaces and Diagnostics",
+     extras: ["scripts/linux/network-diagnostic.sh", "scripts/powershell/Network-Diagnostic.ps1",
+              "docs/assessments/module-3-test.md", "pdf: Networking-Troubleshooting-Guide.pdf"]}
+  - {day: 16, module: module-4, release: 2026-11-14, status: planned, title: "System Logs",
+     extras: ["scripts/linux/log-analyser.sh", "scripts/powershell/Log-Analyser.ps1"]}
+  - {day: 17, module: module-4, release: 2026-11-15, status: planned, title: "Authentication and Security Monitoring",
+     extras: ["scripts/linux/failed-login-report.sh", "scripts/powershell/Failed-Login-Report.ps1"]}
+  - {day: 18, module: module-4, release: 2026-11-15, status: planned, title: "Firewall Management"}
+  - {day: 19, module: module-4, release: 2026-11-16, status: planned, title: "System Security Auditing"}
+  - {day: 20, module: module-4, release: 2026-11-16, status: planned, title: "Network Security Investigation",
+     extras: ["docs/assessments/module-4-test.md", "pdf: Cybersecurity-Command-Reference.pdf"]}
+  - {day: 21, module: module-5, release: 2026-11-17, status: planned, title: "Variables and User Input"}
+  - {day: 22, module: module-5, release: 2026-11-17, status: planned, title: "Conditions and Loops"}
+  - {day: 23, module: module-5, release: 2026-11-18, status: planned, title: "Functions and Reusable Scripts"}
+  - {day: 24, module: module-5, release: 2026-11-18, status: planned, title: "Text and Data Processing"}
+  - {day: 25, module: module-5, release: 2026-11-19, status: planned, title: "Task Scheduling and Automation",
+     extras: ["scripts/linux/system-health.sh", "scripts/powershell/System-Health.ps1",
+              "docs/assessments/module-5-test.md"]}
+  - {day: 26, module: module-6, release: 2026-11-19, status: planned, title: "Remote Administration"}
+  - {day: 27, module: module-6, release: 2026-11-20, status: planned, title: "Network Investigation"}
+  - {day: 28, module: module-6, release: 2026-11-20, status: planned, title: "Advanced System Troubleshooting"}
+  - {day: 29, module: module-6, release: 2026-11-21, status: planned, title: "Integrated Diagnostic Automation",
+     extras: ["scripts/linux/daily-report.sh", "scripts/powershell/Daily-Report.ps1"]}
+  - {day: 30, module: module-6, release: 2026-11-21, status: planned, title: "Final Capstone and Assessment",
+     extras: ["docs/assessments/module-6-test.md", "docs/assessments/final-exam.md",
+              "docs/assessments/final-exam-answer-key.md", "docs/projects/certificate-template.md",
+              "pdf: Final-Assessment.pdf"]}

@@ -1,0 +1,72 @@
+/* Print stylesheet for WeasyPrint: A4, headers/footers, page numbers, no clipping. */
+@page {
+  size: A4;
+  margin: 22mm 16mm 20mm 16mm;
+  @top-left { content: "Linux & PowerShell Professional Mastery"; font: 8pt "DejaVu Sans", sans-serif; color: #475569; }
+  @top-right { content: string(doctitle); font: 8pt "DejaVu Sans", sans-serif; color: #475569; }
+  @bottom-left { content: "MIT License · github.io/linux-powershell-professional-mastery"; font: 7.5pt "DejaVu Sans", sans-serif; color: #64748b; }
+  @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "DejaVu Sans", sans-serif; color: #475569; }
+}
+@page :first { margin: 0; @top-left { content: none; } @top-right { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
+
+body { font: 9.5pt/1.45 "DejaVu Sans", "Liberation Sans", sans-serif; color: #0f172a; string-set: doctitle attr(data-doc-title); }
+
+/* Cover */
+.cover { height: 297mm; padding: 55mm 22mm 0; box-sizing: border-box;
+  background: linear-gradient(160deg, #0f172a 0%, #164e63 100%); color: #f1f5f9; page-break-after: always; }
+.cover-logo { font: bold 46pt "DejaVu Sans Mono", monospace; color: #22d3ee; border: 3px solid #22d3ee;
+  display: inline-block; padding: 4mm 7mm; border-radius: 5mm; }
+.cover-course { font-size: 15pt; color: #a5f3fc; margin-top: 14mm; }
+.cover-title { font-size: 30pt; line-height: 1.15; margin: 4mm 0 8mm; color: #fff; bookmark-level: none; }
+.cover-tagline { font-size: 11.5pt; color: #bef264; }
+.cover-meta { font-size: 10pt; color: #cbd5e1; margin-top: 18mm; }
+.cover-version { font-size: 10pt; color: #e2e8f0; margin-top: 10mm; }
+.cover-copy { font-size: 8.5pt; color: #94a3b8; margin-top: 40mm; }
+
+/* Table of contents with page numbers */
+.toc { page-break-after: always; }
+.toc-title { bookmark-level: 1; }
+.toc ol { padding-left: 6mm; }
+.toc li { margin: 1.4mm 0; }
+.toc a { color: #0f172a; text-decoration: none; }
+.toc a::after { content: leader('.') target-counter(attr(href), page); color: #475569; }
+
+/* Headings */
+h1, h2, h3, h4 { color: #0e7490; line-height: 1.25; page-break-after: avoid; }
+h1.chapter-title { page-break-before: always; font-size: 19pt; border-bottom: 2px solid #0e7490; padding-bottom: 2mm; }
+.chapter:first-of-type h1.chapter-title { page-break-before: auto; }
+h2 { font-size: 13.5pt; margin-top: 7mm; border-bottom: 1px solid #cbd5e1; padding-bottom: 1mm; }
+h3 { font-size: 11pt; margin-top: 5mm; }
+h4 { font-size: 10pt; }
+a { color: #0e7490; }
+
+/* Code: wrap long lines instead of clipping */
+pre, code { font-family: "DejaVu Sans Mono", "Liberation Mono", monospace; }
+code { font-size: 8.4pt; background: #f1f5f9; padding: 0 1px; border-radius: 2px; }
+pre { font-size: 7.8pt; line-height: 1.35; background: #f8fafc; border: 1px solid #e2e8f0; border-left: 3px solid #0e7490;
+  padding: 2.5mm 3mm; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; page-break-inside: auto; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.highlight { margin: 2mm 0; }
+
+/* Tables: fixed layout + wrapping so nothing is cut off */
+table { width: 100%; border-collapse: collapse; table-layout: fixed; margin: 3mm 0; font-size: 7.8pt; page-break-inside: auto; }
+th, td { border: 1px solid #cbd5e1; padding: 1.3mm 1.6mm; vertical-align: top; overflow-wrap: anywhere; word-wrap: break-word; }
+th { background: #e0f2fe; color: #0c4a6e; text-align: left; }
+tr { page-break-inside: avoid; }
+td code, th code { font-size: 7.3pt; }
+
+/* Admonitions (note, tip, warning, danger, info, question, success) and flattened tabs */
+.admonition { border: 1px solid #cbd5e1; border-left: 4px solid #0891b2; background: #f8fafc; padding: 1mm 3mm 2mm; margin: 3mm 0; border-radius: 1.5mm; }
+.admonition-title { font-weight: bold; margin: 1mm 0; color: #0e7490; }
+.admonition.warning, .admonition.danger { border-left-color: #dc2626; }
+.admonition.warning .admonition-title, .admonition.danger .admonition-title { color: #b91c1c; }
+.admonition.tip, .admonition.success { border-left-color: #65a30d; }
+.admonition.tip .admonition-title, .admonition.success .admonition-title { color: #4d7c0f; }
+.admonition.question { border-left-color: #7c3aed; }
+.admonition.question .admonition-title { color: #6d28d9; }
+.admonition.tab { border-left-color: #334155; background: #fff; }
+.admonition.tab .admonition-title { color: #334155; }
+
+ul, ol { padding-left: 6mm; }
+li { margin: 0.6mm 0; }
+img { max-width: 100%; }

@@ -1,0 +1,180 @@
+site_name: Linux & PowerShell Professional Mastery
+site_description: >-
+  A complete 30-day practical training program for Linux Bash and Windows PowerShell,
+  covering system administration, cybersecurity, network analysis and automation.
+site_author: Linux & PowerShell Professional Mastery contributors
+# SITE_URL and REPO_URL are injected by GitHub Actions so the username is never hard-coded.
+site_url: !ENV [SITE_URL, "http://127.0.0.1:8000/"]
+repo_url: !ENV [REPO_URL, "https://github.com/"]
+repo_name: linux-powershell-professional-mastery
+edit_uri: edit/main/docs/
+copyright: Copyright &copy; 2026 Linux & PowerShell Professional Mastery &middot; MIT License
+
+theme:
+  name: material
+  language: en
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
+  icon:
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to system preference
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - navigation.tracking
+    - navigation.path
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.action.edit
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: !ENV [REPO_URL, "https://github.com/"]
+      name: Source repository
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+
+# NAVIGATION — the nightly content job appends new lessons/labs here.
+# Keep the ">>> / <<<" marker comments intact; tools/release_day.py relies on them.
+nav:
+  - Home: index.md
+  - Getting Started:
+      - getting-started/index.md
+      - Windows Setup: getting-started/windows-setup.md
+      - Ubuntu Setup: getting-started/ubuntu-setup.md
+      - WSL2 Installation: getting-started/wsl2.md
+      - PowerShell 7 Installation: getting-started/powershell-install.md
+      - Lab Environment & Safety: getting-started/lab-environment.md
+  - 30-Day Course:
+      - course/index.md
+      - Release Schedule: course/schedule.md
+      - "Module 1: Command-Line Fundamentals":
+          - course/module-1/index.md
+          # >>> DAYS module-1
+          - "Day 01: Introduction to Linux & PowerShell": course/module-1/day-01.md
+          - "Day 02: File & Directory Management": course/module-1/day-02.md
+          # <<< DAYS module-1
+      - "Module 2: System Administration":
+          - course/module-2/index.md
+          # >>> DAYS module-2
+          # <<< DAYS module-2
+      - "Module 3: Networking & Troubleshooting":
+          - course/module-3/index.md
+          # >>> DAYS module-3
+          # <<< DAYS module-3
+      - "Module 4: Security, Logs & Monitoring":
+          - course/module-4/index.md
+          # >>> DAYS module-4
+          # <<< DAYS module-4
+      - "Module 5: Scripting & Automation":
+          - course/module-5/index.md
+          # >>> DAYS module-5
+          # <<< DAYS module-5
+      - "Module 6: Professional Operations & Projects":
+          - course/module-6/index.md
+          # >>> DAYS module-6
+          # <<< DAYS module-6
+  - Command Reference:
+      - reference/index.md
+      - Linux Commands: reference/linux.md
+      - PowerShell Commands: reference/powershell.md
+      - Side-by-Side Comparison: reference/comparison.md
+  - Practical Labs:
+      - labs/index.md
+      # >>> LABS
+      - "Lab 01: First Contact": labs/lab-01.md
+      - "Lab 02: Project Workspace": labs/lab-02.md
+      # <<< LABS
+  - Career Pathways:
+      - careers/index.md
+      - SOC Analyst: careers/soc-analyst.md
+      - Network Analyst: careers/network-analyst.md
+      - System Administrator: careers/sysadmin.md
+  - Projects:
+      - projects/index.md
+      - Script Library: projects/scripts.md
+  - Assessments:
+      - assessments/index.md
+  - Downloads:
+      - downloads/index.md
+  - About:
+      - about/index.md
+      - Contributing: about/contributing.md
+      - Changelog: about/changelog.md

@@ -1,0 +1,8 @@
+# Normalise line endings: Bash scripts MUST use LF or they fail with $'\r' errors.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.pdf binary
+*.png binary
+*.svg text eol=lf
