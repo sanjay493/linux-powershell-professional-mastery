@@ -34,6 +34,15 @@ Follow [PowerShell 7 Installation](powershell-install.md). The short version is:
 winget install --id Microsoft.PowerShell --source winget
 ```
 
+??? warning "Install failed with `Installer failed with exit code: 0x80072ee2`?"
+    `0x80072EE2` is a **network timeout**. winget downloaded and verified the installer, but the MSI timed out while contacting Microsoft Update during setup. This is common behind proxies, firewalls, VPNs or on slow connections. Check your connection and retry. If it fails again, install without the Microsoft Update opt-in from an **elevated** terminal:
+
+    ```powershell
+    winget install --id Microsoft.PowerShell --source winget --override "/quiet /norestart ADD_PATH=1 USE_MU=0 ENABLE_MU=0"
+    ```
+
+    The full explanation, alternatives (manual MSI, Store, ZIP) and log collection steps are in [Troubleshooting Windows installation](powershell-install.md#installer-failed-with-exit-code-0x80072ee2).
+
 ## 5. Install Git and Visual Studio Code
 
 ```powershell
