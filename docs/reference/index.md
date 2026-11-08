@@ -50,8 +50,8 @@ A searchable reference for every command taught in the course. Use the **search 
 | Navigation & system information | :material-check: | :material-check: | Days 1–2 |
 | Files & directories | :material-check: | :material-check: | Day 2 |
 | Help & discovery | :material-check: | :material-check: | Day 1 |
-| Reading files, redirection | Day 3 | Day 3 | Released 2026-11-08 22:00 IST |
-| Searching | Day 4 | Day 4 | |
+| Reading files, redirection | :material-check: | :material-check: | Day 3 |
+| Searching | :material-check: | :material-check: | Day 4 |
 | Pipelines & history | Day 5 | Day 5 | |
 | Users & groups | Day 6 | Day 6 | |
 | Permissions | Day 7 | Day 7 | |

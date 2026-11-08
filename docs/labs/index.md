@@ -13,8 +13,8 @@ Every day has a dedicated lab. Each lab includes a **Lab ID, objective, required
 |---|---|---|---|---|
 | [LAB-01](lab-01.md) | First Contact | 01 | Identify user, host, OS and shell; write a ticket-ready identity line | Published |
 | [LAB-02](lab-02.md) | Project Workspace | 02 | Build, back up, reorganise and safely clean a project tree | Published |
-| LAB-03 | Log Reader | 03 | Read, sample and measure large log files; redirect output | 2026-11-08 22:00 IST |
-| LAB-04 | Needle in the Haystack | 04 | Find files and error patterns across a directory tree | 2026-11-08 22:00 IST |
+| [LAB-03](lab-03.md) | Log Reader | 03 | Read, sample and measure large log files; redirect output | Published |
+| [LAB-04](lab-04.md) | Needle in the Haystack | 04 | Find files and error patterns across a directory tree | Published |
 | LAB-05 | Pipeline Builder | 05 | Build text and object pipelines; handle exit codes | 2026-11-09 |
 | LAB-06 | Onboard & Offboard | 06 | Create, modify, lock and audit lab users | 2026-11-09 |
 | LAB-07 | Lock It Down | 07 | Fix an over-permissive shared folder (with backup) | 2026-11-10 |

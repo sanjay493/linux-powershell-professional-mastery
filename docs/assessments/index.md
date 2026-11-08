@@ -12,6 +12,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 |---|---|
 | 01 | [Introduction to Linux and PowerShell](../course/module-1/day-01.md#quiz) |
 | 02 | [File and Directory Management](../course/module-1/day-02.md#quiz) |
+| 03 | [Reading and Managing Files](../course/module-1/day-03.md#quiz) |
+| 04 | [Searching Files and Text](../course/module-1/day-04.md#quiz) |
 
 ## Module tests
 

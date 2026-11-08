@@ -909,4 +909,4 @@ Test-Path C:\x ; Join-Path $HOME lab ; Get-Item -LiteralPath 'a[1].txt'
 
 ---
 
-**Previous:** [Day 01: Introduction to Linux and PowerShell](day-01.md) · **Next:** Day 03: Reading and Managing Files (see the [release schedule](../schedule.md))
+**Previous:** [Day 01: Introduction to Linux and PowerShell](day-01.md) · **Next:** [Day 03: Reading and Managing Files](day-03.md)

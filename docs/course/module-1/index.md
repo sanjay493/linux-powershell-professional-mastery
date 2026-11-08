@@ -21,8 +21,8 @@ You will learn what shells are, move around the filesystem, create and manage fi
 |---|---|---|---|
 | 01 | [Introduction to Linux and PowerShell](day-01.md) | [Lab 01](../../labs/lab-01.md) | Published |
 | 02 | [File and Directory Management](day-02.md) | [Lab 02](../../labs/lab-02.md) | Published |
-| 03 | Reading and Managing Files | Lab 03 | 2026-11-08 22:00 IST |
-| 04 | Searching Files and Text | Lab 04 | 2026-11-08 22:00 IST |
+| 03 | [Reading and Managing Files](day-03.md) | [Lab 03](../../labs/lab-03.md) | Published |
+| 04 | [Searching Files and Text](day-04.md) | [Lab 04](../../labs/lab-04.md) | Published |
 | 05 | Command Help, History and Pipelines | Lab 05 | 2026-11-09 22:00 IST |
 
 **Module test:** released with Day 05 in [Assessments](../../assessments/index.md).

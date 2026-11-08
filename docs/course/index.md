@@ -15,8 +15,8 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 |---|---|---|
 | 01 | [Introduction to Linux and PowerShell](module-1/day-01.md) | `whoami` `hostname` `pwd` `ls` `uname` `date` · `Get-Location` `Get-ChildItem` `Get-ComputerInfo` `Get-Date` |
 | 02 | [File and Directory Management](module-1/day-02.md) | `cd` `mkdir` `touch` `cp` `mv` `rm` · `Set-Location` `New-Item` `Copy-Item` `Move-Item` `Remove-Item` |
-| 03 | Reading and Managing Files | `cat` `less` `head` `tail` `wc` · `Get-Content` `Select-Object` `Measure-Object` · redirection |
-| 04 | Searching Files and Text | `find` `grep` `locate` `which` · `Get-ChildItem` `Select-String` `Where-Object` · regex |
+| 03 | [Reading and Managing Files](module-1/day-03.md) | `cat` `less` `head` `tail` `wc` · `Get-Content` `Select-Object` `Measure-Object` · redirection |
+| 04 | [Searching Files and Text](module-1/day-04.md) | `find` `grep` `locate` `which` · `Get-ChildItem` `Select-String` `Where-Object` · regex |
 | 05 | Command Help, History and Pipelines | `man` `history` `type` · `Get-Help` `Get-Command` `Get-History` · pipelines, exit codes |
 
 ## Module 2 — [System Administration](module-2/index.md)

@@ -35,7 +35,7 @@ Example outputs in lessons are labelled as examples. Your values will differ.
 
 | | |
 |---|---|
-| Version | 0.1.0 (Days 01–02 published; nightly releases in progress) |
+| Version | 0.2.0 (Days 01–04 published; nightly releases in progress) |
 | Licence | MIT |
 | Source | The **repository link** in the site header |
 

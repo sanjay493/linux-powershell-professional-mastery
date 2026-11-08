@@ -130,6 +130,8 @@ nav:
           # >>> DAYS module-1
           - "Day 01: Introduction to Linux & PowerShell": course/module-1/day-01.md
           - "Day 02: File & Directory Management": course/module-1/day-02.md
+          - "Day 03: Reading & Managing Files": course/module-1/day-03.md
+          - "Day 04: Searching Files & Text": course/module-1/day-04.md
           # <<< DAYS module-1
       - "Module 2: System Administration":
           - course/module-2/index.md
@@ -161,6 +163,8 @@ nav:
       # >>> LABS
       - "Lab 01: First Contact": labs/lab-01.md
       - "Lab 02: Project Workspace": labs/lab-02.md
+      - "Lab 03: Log Reader": labs/lab-03.md
+      - "Lab 04: Needle in the Haystack": labs/lab-04.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md

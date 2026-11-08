@@ -9,7 +9,7 @@ New lessons, labs and their supporting materials are published **every night at 
 | Release (IST) | Days | Also included | Status |
 |---|---|---|---|
 | 2026-11-08 (launch) | 01, 02 | Lab 01–02, `system-info` scripts, references | :material-check-circle: Published |
-| 2026-11-08 22:00 | 03, 04 | Labs 03–04 | Scheduled |
+| 2026-11-08 22:00 | 03, 04 | Labs 03–04, reading/redirection and searching references | :material-check-circle: Published |
 | 2026-11-09 22:00 | 05, 06 | Labs 05–06, **Module 1 test** | Scheduled |
 | 2026-11-10 22:00 | 07, 08 | Labs 07–08, `process-monitor` scripts | Scheduled |
 | 2026-11-11 22:00 | 09, 10 | Labs 09–10, `disk-monitor` scripts, **Module 2 test** | Scheduled |

@@ -176,7 +176,7 @@ Platforms: **Windows PowerShell 5.1** (Windows 11) and **PowerShell 7.4+** (Wind
 | **Version / OS** | 5.1, 7.x · all OS. Aliases: `move`, `mv` (Windows), `mi` / `ren`, `rni` |
 | **Description** | `Move-Item` moves (and can rename); `Rename-Item` renames in place. |
 | **Syntax** | `Move-Item [-Path] <String[]> [[-Destination] <String>] [-Force]` · `Rename-Item [-Path] <String> [-NewName] <String>` |
-| **Example** | <code>Get-ChildItem *.log &#124; Rename-Item -NewName { $_.BaseName + '-old' + $_.Extension }</code> |
+| **Example** | <code>Get-ChildItem *.log &#124; Rename-Item -NewName { $PSItem.BaseName + '-old' + $PSItem.Extension }</code> |
 | **Expected output** | `app.log` → `app-old.log` (no output by default) |
 | **Equivalent** | `mv` |
 | **Common errors** | `Cannot create a file when that file already exists` (`Move-Item` without `-Force`) · `-NewName` given a path |
@@ -221,3 +221,172 @@ Platforms: **Windows PowerShell 5.1** (Windows 11) and **PowerShell 7.4+** (Wind
 | **Equivalent** | `"$HOME/lpm-lab"`, `basename`, `dirname` |
 | **Use case** | Cross-platform scripts. |
 | **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/join-path> |
+
+## Reading Files & Redirection
+
+### Get-Content
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Aliases: `gc`, `cat` and `type` (Windows) |
+| **Description** | Reads a file and emits one string object per line (or one string with `-Raw`). |
+| **Syntax** | `Get-Content [-Path] <String[]> [-TotalCount <Int64>] [-Tail <Int32>] [-Wait] [-Raw] [-ReadCount <Int64>] [-Encoding <Encoding>] [-LiteralPath <String[]>]` |
+| **Parameters** | `-TotalCount` (`-First`, `-Head`) first N lines · `-Tail` (`-Last`) last N lines · `-Wait` follow new lines · `-Raw` whole file as one string · `-ReadCount` batch size · `-Encoding` · `-AsByteStream` (7; 5.1 uses `-Encoding Byte`) |
+| **Example** | <code>Get-Content C:\Logs\app.log -Tail 0 -Wait &#124; Where-Object { $_ -match 'ERROR' }</code> |
+| **Expected output** | New `ERROR` lines as they are written (Ctrl+C to stop) |
+| **Equivalent** | `cat`, `head`, `tail`, `tail -f` |
+| **Common errors** | `Cannot find path ...` · file locked by another process · `-Wait` without `-Tail` prints the whole file first · `cat -n` fails on Windows (alias) |
+| **Use case** | Sampling and following large logs without opening an editor. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-content> |
+
+### Select-Object (first / last / skip)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Alias: `select` |
+| **Description** | Selects objects by position (and properties, covered later). |
+| **Syntax** | `Select-Object [-First <Int32>] [-Last <Int32>] [-Skip <Int32>] [-SkipLast <Int32>] [-Index <Int32[]>] [-Unique]` |
+| **Parameters** | `-First N` · `-Last N` · `-Skip N` · `-SkipLast N` (5.0+) · `-Index` zero-based positions · `-Unique` |
+| **Example** | <code>Get-Content access.log &#124; Select-Object -Skip 999 -First 11</code> |
+| **Expected output** | Lines 1000–1010 of the file |
+| **Equivalent** | `tail -n +N`, <code>head &#124; tail</code>, `sed -n 'A,Bp'` |
+| **Common errors** | Off-by-one with zero-based `-Index` and array indexes |
+| **Use case** | Extracting an exact line range as evidence. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/select-object> |
+
+### Measure-Object
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Alias: `measure`. `-StandardDeviation` and `-AllStats` are 7.x only |
+| **Description** | Counts objects, measures text (lines, words, characters) and calculates sum, average, minimum and maximum of a property. |
+| **Syntax** | `Measure-Object [[-Property] <String[]>] [-Line] [-Word] [-Character] [-IgnoreWhiteSpace] [-Sum] [-Average] [-Minimum] [-Maximum]` |
+| **Parameters** | `-Line`, `-Word`, `-Character` text statistics · `-Property` with `-Sum`, `-Average`, `-Minimum`, `-Maximum` |
+| **Example** | <code>Get-ChildItem C:\Windows\Logs -Recurse -File -ErrorAction SilentlyContinue &#124; Measure-Object Length -Sum</code> |
+| **Expected output** | `Count : 214` · `Sum : 98345012` … (example) |
+| **Equivalent** | `wc`, `du` (Day 9), `awk` sums (Day 24) |
+| **Common errors** | `-Line` may differ from `wc -l` (empty lines); use `(Get-Content f).Count` for exact line counts |
+| **Use case** | Totalling log sizes or counting error lines. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/measure-object> |
+
+### Out-File
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | Writes formatted output to a file; this is what `>` and `>>` do. |
+| **Syntax** | `Out-File [-FilePath] <String> [[-Encoding] <Encoding>] [-Append] [-NoClobber] [-Width <Int32>] [-NoNewline]` |
+| **Parameters** | `-Append` · `-NoClobber` refuse to overwrite · `-Encoding` (5.1 default **UTF-16 LE**; 7 default UTF-8 without BOM) · `-Width` line width |
+| **Example** | <code>Get-Service &#124; Out-File C:\Temp\services.txt -Encoding utf8 -Width 200</code> |
+| **Expected output** | None on screen; a UTF-8 text file |
+| **Equivalent** | `>` / `>>` in Bash |
+| **Common errors** | Linux tools cannot read 5.1 output (UTF-16) · long lines truncated (use `-Width`) · `The file ... already exists` with `-NoClobber` |
+| **Use case** | Saving diagnostic output for a ticket in a portable encoding. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/out-file> |
+
+### Tee-Object
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Alias: `tee` (Windows). `-Encoding` is 7.2+ |
+| **Description** | Saves pipeline objects to a file or variable **and** passes them on. |
+| **Syntax** | `Tee-Object [-FilePath] <String> [-Append]` · `Tee-Object -Variable <String>` |
+| **Parameters** | `-FilePath` · `-Append` · `-Variable` · `-Encoding` (7.2+) |
+| **Example** | <code>Get-Process &#124; Tee-Object -FilePath procs.txt &#124; Sort-Object CPU -Descending &#124; Select-Object -First 5</code> |
+| **Expected output** | Top 5 processes on screen; full list in `procs.txt` |
+| **Equivalent** | `tee`, `tee -a` |
+| **Common errors** | 5.1 writes UTF-16 LE |
+| **Use case** | Keeping an exact record of investigation output while working. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/tee-object> |
+
+### Set-Content / Add-Content
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Aliases: `sc` (5.1 only), `ac` |
+| **Description** | Write or append **string** content (no console formatting). |
+| **Syntax** | `Set-Content [-Path] <String[]> [-Value] <Object[]> [-Encoding <Encoding>] [-NoNewline]` · `Add-Content` (same) |
+| **Parameters** | `-Value` · `-Encoding` (5.1 default ANSI; 7 default UTF-8 without BOM) · `-NoNewline` |
+| **Example** | `Add-Content -Path C:\Logs\job.log -Value "$(Get-Date -Format s) backup finished"` |
+| **Expected output** | None; one line appended |
+| **Equivalent** | `echo ... > f` / `echo ... >> f` |
+| **Common errors** | `Stream was not readable` / file in use by another process |
+| **Use case** | Writing configuration or log lines from scripts. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/set-content> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/add-content> |
+
+### Redirection operators and output streams
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Stream 6 (Information) is 5.0+ |
+| **Description** | Redirect streams 1 Success, 2 Error, 3 Warning, 4 Verbose, 5 Debug, 6 Information to files, `$null`, or into the success stream. |
+| **Syntax** | `cmd > f` · `cmd >> f` · `cmd 2> f` · `cmd 2>&1` · `cmd 3> f` … `cmd 6> f` · `cmd *> f` · `cmd 2>$null` |
+| **Parameters** | `n>` / `n>>` stream n to file · `n>&1` merge into success · `*` all streams. No `<` input redirection |
+| **Example** | `.\Deploy.ps1 -Verbose *> deploy-$(Get-Date -Format yyyyMMdd).log` |
+| **Expected output** | None on screen; every stream in the log |
+| **Equivalent** | Bash `>`, `2>`, `2>&1`, `&>` |
+| **Common errors** | `The '<' operator is reserved for future use.` · `Write-Host` output not captured (stream 6; use `6>&1` or `Write-Output`) |
+| **Use case** | Capturing complete logs of scheduled scripts. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_redirection> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_output_streams> |
+
+## Searching
+
+### Get-ChildItem (searching)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. `-Depth` 5.0+ |
+| **Description** | Recursively finds files and folders by name, then by any property with `Where-Object`. |
+| **Syntax** | `Get-ChildItem [[-Path] <String[]>] [[-Filter] <String>] [-Include <String[]>] [-Exclude <String[]>] [-Recurse] [-Depth <UInt32>] [-File] [-Directory] [-Force]` |
+| **Parameters** | `-Filter` fastest single wildcard · `-Include`/`-Exclude` several wildcards · `-File`/`-Directory` · `-Force` include hidden/system · `-ErrorAction SilentlyContinue` hide access errors |
+| **Example** | <code>Get-ChildItem $env:TEMP -Recurse -File -Force -ErrorAction SilentlyContinue &#124; Where-Object LastWriteTime -gt (Get-Date).AddHours(-1)</code> |
+| **Expected output** | Files changed in the last hour in the temp folder |
+| **Equivalent** | `find PATH -type f -mmin -60` |
+| **Common errors** | Hidden items missing (add `-Force`) · `-Include` ignored without `-Recurse` or a `\*` path · `-Filter *.htm` also matches `.html` on Windows |
+| **Use case** | Sweeping malware drop locations for new files. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-childitem> |
+
+### Select-String
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Alias: `sls`. `-Raw`, `-NoEmphasis` 7.x only |
+| **Description** | Searches text in files or input strings with .NET regular expressions. **Case-insensitive by default.** Returns `MatchInfo` objects (`Path`, `LineNumber`, `Line`, `Matches`). |
+| **Syntax** | `Select-String [-Pattern] <String[]> [-Path] <String[]> [-SimpleMatch] [-CaseSensitive] [-NotMatch] [-Context <Int32[]>] [-List] [-AllMatches] [-Quiet]` |
+| **Parameters** | `-SimpleMatch` literal · `-CaseSensitive` · `-NotMatch` invert · `-Context B,A` · `-List` first match per file · `-AllMatches` · `-Quiet` True/False · `-Include`/`-Exclude` |
+| **Example** | <code>Get-ChildItem C:\inetpub\logs -Recurse -Filter *.log &#124; Select-String -Pattern ' 500 ' -List &#124; Select-Object Path</code> |
+| **Expected output** | Paths of IIS log files containing HTTP 500 responses (example) |
+| **Equivalent** | `grep` (case-sensitive by default) |
+| **Common errors** | No `-Recurse` parameter (pipe from `Get-ChildItem`) · regex characters in literal text (use `-SimpleMatch`) · `Unterminated [] set` |
+| **Use case** | Error triage and secret scanning across many files. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/select-string> |
+
+### Where-Object
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Aliases: `where`, `?`. Simplified syntax 3.0+ |
+| **Description** | Keeps only objects for which a condition is true. |
+| **Syntax** | `Where-Object [-FilterScript] <ScriptBlock>` · `Where-Object <Property> -<Operator> <Value>` |
+| **Parameters** | Operators `-eq -ne -gt -ge -lt -le -like -match -in -contains` (case-sensitive: `-ceq -clike -cmatch`), combined with `-and -or -not` in a script block |
+| **Example** | <code>Get-ChildItem D:\Shares -Recurse -File &#124; Where-Object { $PSItem.Length -gt 1GB -and $PSItem.LastWriteTime -lt (Get-Date).AddYears(-1) }</code> |
+| **Expected output** | Large files untouched for a year (example) |
+| **Equivalent** | `find -size`, `-mtime`; `grep` on text |
+| **Common errors** | `where ping` runs `Where-Object`, not `where.exe` · filtering right instead of left (slow) |
+| **Use case** | Storage clean-up candidates. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/where-object> |
+
+### where.exe
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows only (external program, all PowerShell versions) |
+| **Description** | Lists executables matching a name in the `PATH` (like `which -a`). |
+| **Syntax** | `where.exe [/R dir] [/Q] pattern` |
+| **Parameters** | `/R dir` search recursively from `dir` · `/Q` quiet (exit code only) |
+| **Example** | `where.exe python` |
+| **Expected output** | `C:\Users\student\AppData\Local\Microsoft\WindowsApps\python.exe` (example) |
+| **Equivalent** | `which -a`, `command -v`; in PowerShell prefer `Get-Command` |
+| **Common errors** | Typing `where` without `.exe` (alias for `Where-Object`) |
+| **Use case** | Discovering which copy of a tool is first in `PATH`. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/where> |
