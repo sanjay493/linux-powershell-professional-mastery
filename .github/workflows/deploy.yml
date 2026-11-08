@@ -136,10 +136,18 @@ jobs:
 
       - name: Build site (strict mode fails on broken links and nav problems)
         env:
-          # Project Pages URL: https://<owner>.github.io/<repo>/
-          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
-        run: mkdocs build --strict
+          PROJECT_PAGES_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+        run: |
+          # docs/CNAME holds the custom domain (e.g. learn.agentweekly.in); fall back to the github.io URL.
+          if [ -s docs/CNAME ]; then
+            SITE_URL="https://$(tr -d '[:space:]' < docs/CNAME)/"
+          else
+            SITE_URL="$PROJECT_PAGES_URL"
+          fi
+          export SITE_URL
+          echo "Building for $SITE_URL"
+          mkdocs build --strict
 
       - name: Upload PDFs as a build artefact
         uses: actions/upload-artifact@v4

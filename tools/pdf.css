@@ -4,7 +4,7 @@
   margin: 22mm 16mm 20mm 16mm;
   @top-left { content: "Linux & PowerShell Professional Mastery"; font: 8pt "DejaVu Sans", sans-serif; color: #475569; }
   @top-right { content: string(doctitle); font: 8pt "DejaVu Sans", sans-serif; color: #475569; }
-  @bottom-left { content: "MIT License · github.io/linux-powershell-professional-mastery"; font: 7.5pt "DejaVu Sans", sans-serif; color: #64748b; }
+  @bottom-left { content: "MIT License · Linux & PowerShell Professional Mastery"; font: 7.5pt "DejaVu Sans", sans-serif; color: #64748b; }
   @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 8pt "DejaVu Sans", sans-serif; color: #475569; }
 }
 @page :first { margin: 0; @top-left { content: none; } @top-right { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
