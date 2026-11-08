@@ -131,17 +131,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Configure GitHub Pages
-        id: pages
-        if: github.event_name != 'pull_request'
-        uses: actions/configure-pages@v5
-
       - name: Build and validate PDFs
         run: python tools/build_pdfs.py
 
       - name: Build site (strict mode fails on broken links and nav problems)
         env:
-          SITE_URL: ${{ steps.pages.outputs.base_url && format('{0}/', steps.pages.outputs.base_url) || 'http://localhost/' }}
+          # Project Pages URL: https://<owner>.github.io/<repo>/
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
         run: mkdocs build --strict
 
