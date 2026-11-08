@@ -196,7 +196,8 @@ def build_html(defn: dict, version: str) -> str:
         raw = src.read_text(encoding="utf-8")
         body = md_to_html(raw, f"c{i}")
         h1 = re.search(r"<h1[^>]*>(.*?)</h1>", body, re.S)
-        title = re.sub("<[^>]+>", "", h1.group(1)).strip() if h1 else src.stem
+        # The rendered heading is already HTML-escaped; unescape so it is not escaped twice below.
+        title = html.unescape(re.sub("<[^>]+>", "", h1.group(1)).strip()) if h1 else src.stem
         anchor = f"chapter-{i}"
         body = re.sub(r"<h1([^>]*)>", f'<h1 id="{anchor}" class="chapter-title"\\1>', body, count=1) \
             if h1 else f'<h1 id="{anchor}" class="chapter-title">{html.escape(title)}</h1>' + body
