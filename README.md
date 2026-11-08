@@ -6,7 +6,7 @@
 
 A complete, free, 30-day practical training programme for **Linux Bash** and **Windows PowerShell**, covering system administration, cybersecurity, network analysis and automation. Every lesson teaches both platforms side by side, with labs, quizzes, homework and official documentation links.
 
-- **Website:** `https://<github-user>.github.io/linux-powershell-professional-mastery/` (deployed by GitHub Actions)
+- **Website:** <https://learn.agentweekly.in/> (GitHub Pages custom domain, deployed by GitHub Actions; the github.io address redirects here)
 - **Platforms:** Ubuntu 24.04 LTS · Windows 11 · Windows PowerShell 5.1 · PowerShell 7.4+
 - **Licence:** MIT
 
