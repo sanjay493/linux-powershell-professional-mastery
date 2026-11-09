@@ -96,3 +96,45 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Quiet test | `-q` | `-Quiet` | |
 | Indexed name search | `locate` | — | |
 | Which program runs | `command -v` · `type -a` · `which -a` | `Get-Command [-All]` · `where.exe` | ⚠ `where` = `Where-Object` |
+
+## Help, history & pipelines
+
+| Task | Bash | PowerShell | Notes |
+|---|---|---|---|
+| What is this name? | `type -a name` | `Get-Command name -All` | |
+| Dependency check | `command -v name` | `Get-Command name -ErrorAction SilentlyContinue` | |
+| Reverse alias lookup | `alias` | `Get-Alias -Definition Get-ChildItem` | |
+| Search help by keyword | `man -k word` · `apropos word` | `Get-Command *word*` · `Get-Help word` | |
+| One option / parameter | `/` search in `man` | `Get-Help cmd -Parameter Name` | |
+| Object members | — | <code>... &#124; Get-Member</code> | ⚠ text has no members |
+| Session history | `history` | `Get-History` | ⚠ PS: current session only |
+| Persistent history | `~/.bash_history` | `(Get-PSReadLineOption).HistorySavePath` | |
+| Re-run entry N | `!N` | `Invoke-History N` · `r N` | |
+| Reverse search | ++ctrl+r++ | ++ctrl+r++ | PSReadLine |
+| Count and rank | <code>sort &#124; uniq -c &#124; sort -rn</code> | <code>Group-Object X &#124; Sort-Object Count -Descending</code> | |
+| Sum a column | `awk '{ s += $10 } END { print s }'` | <code>(... &#124; Measure-Object Bytes -Sum).Sum</code> | |
+| On success / failure | `a && b` · <code>a &#124;&#124; b</code> | 7+: `a && b` · <code>a &#124;&#124; b</code> · 5.1: `a; if ($?) { b }` | ⚠ 5.1 parser error |
+| Last status | `$?` (0–255) | `$?` (Boolean) · `$LASTEXITCODE` | ⚠ |
+| Every pipe stage | `${PIPESTATUS[@]}` | — | |
+| Fail on any stage | `set -o pipefail` | `$ErrorActionPreference = 'Stop'` | Not identical |
+| Catch an error | `if ! cmd; then …; fi` | `try { cmd -ErrorAction Stop } catch { … }` | |
+
+## Users & groups
+
+| Task | Bash (Ubuntu) | PowerShell (Windows only) | Notes |
+|---|---|---|---|
+| Who am I / my groups | `id` · `groups` | `whoami /user /groups` | |
+| List local users | `getent passwd` | `Get-LocalUser` | |
+| One user's details | `getent passwd NAME` · `chage -l NAME` | <code>Get-LocalUser NAME &#124; Select-Object &#42;</code> · `net user NAME` | |
+| Create a user | `sudo useradd -m -s /bin/bash NAME` · `sudo adduser NAME` | `New-LocalUser -Name NAME -Password (Read-Host -AsSecureString)` | `adduser` is Debian/Ubuntu |
+| Set a password | `sudo passwd NAME` | `Set-LocalUser -Name NAME -Password (Read-Host -AsSecureString)` | Never on the command line |
+| Lock / disable | `sudo usermod -L -e 1 NAME` | `Disable-LocalUser -Name NAME` | `passwd -l` alone does not stop SSH keys |
+| Unlock / enable | `sudo usermod -U -e '' NAME` | `Enable-LocalUser -Name NAME` | |
+| Account expiry | `sudo chage -E 2026-12-31 NAME` | `Set-LocalUser -Name NAME -AccountExpires (Get-Date '2026-12-31')` | |
+| Delete a user | `sudo userdel NAME` (home kept) | `Remove-LocalUser -Name NAME` (profile kept) | Archive data first |
+| Create a group | `sudo groupadd NAME` | `New-LocalGroup -Name NAME` | |
+| Add to group | `sudo usermod -aG GROUP NAME` · `sudo gpasswd -a NAME GROUP` | `Add-LocalGroupMember -Group GROUP -Member NAME` | ⚠ `-G` without `-a` replaces groups |
+| Remove from group | `sudo gpasswd -d NAME GROUP` | `Remove-LocalGroupMember -Group GROUP -Member NAME` | |
+| List group members | `getent group GROUP` | `Get-LocalGroupMember -Group GROUP` | |
+| Admin group | `sudo` (Ubuntu) · `wheel` (RHEL family) | `Administrators` | |
+| Extra UID 0 accounts | `awk -F: '$3 == 0' /etc/passwd` | <code>Get-LocalUser &#124; Where-Object SID -like '&#42;-500'</code> (built-in Administrator) | |

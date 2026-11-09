@@ -1150,4 +1150,4 @@ Get-Command name ; Get-Command name -All ; (Get-Command ping).Source ; where.exe
 
 ---
 
-**Previous:** [Day 03: Reading and Managing Files](day-03.md) · **Next:** Day 05: Command Help, History and Pipelines (see the [release schedule](../schedule.md))
+**Previous:** [Day 03: Reading and Managing Files](day-03.md) · **Next:** [Day 05: Command Help, History and Pipelines](day-05.md)

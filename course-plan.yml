@@ -35,9 +35,9 @@ days:
   - {day: 2, module: module-1, release: 2026-11-08, status: published, title: "File and Directory Management"}
   - {day: 3, module: module-1, release: 2026-11-08, status: published, title: "Reading and Managing Files"}
   - {day: 4, module: module-1, release: 2026-11-08, status: published, title: "Searching Files and Text"}
-  - {day: 5, module: module-1, release: 2026-11-09, status: planned, title: "Command Help, History and Pipelines",
+  - {day: 5, module: module-1, release: 2026-11-09, status: published, title: "Command Help, History and Pipelines",
      extras: ["docs/assessments/module-1-test.md"]}
-  - {day: 6, module: module-2, release: 2026-11-09, status: planned, title: "Users and Groups"}
+  - {day: 6, module: module-2, release: 2026-11-09, status: published, title: "Users and Groups"}
   - {day: 7, module: module-2, release: 2026-11-10, status: planned, title: "File Permissions and Access Control"}
   - {day: 8, module: module-2, release: 2026-11-10, status: planned, title: "Processes and Services",
      extras: ["scripts/linux/process-monitor.sh", "scripts/powershell/Process-Monitor.ps1"]}

@@ -6,6 +6,14 @@ description: "Release history of the course."
 
 All notable changes are listed here, newest first. Nightly releases add two days each.
 
+## 2026-11-09 — v0.3.0 (nightly release: Days 05–06)
+
+- **Day 05** Command Help, History and Pipelines (`man` sections, `man -k`/`-f`, `--help`, `help`, `type -a`, `command -v`, `history`, `fc`, history expansion, `HISTCONTROL`/`HISTTIMEFORMAT`; `Get-Help -Examples/-Parameter/-Online`, `Get-Command -All/-ParameterName`, `Get-Alias -Definition`, `Get-Member`, `Get-History`, `Invoke-History`, PSReadLine history; text vs object pipelines, `;` `&&` `||` (PowerShell 7+), `$?`, `PIPESTATUS`, `pipefail`, `$LASTEXITCODE`, `-ErrorAction`, `try`/`catch`/`finally`), with **Lab 05: Pipeline Builder**.
+- **Day 06** Users and Groups (`/etc/passwd`, `/etc/shadow`, `/etc/group`, `id`, `getent`, `useradd`, `adduser` (Debian/Ubuntu), `usermod -aG`, `passwd`, `chage`, `userdel`, `groupadd`, `gpasswd`; `Get-LocalUser`, `New-LocalUser`, `Set-LocalUser`, `Disable-LocalUser`, `Remove-LocalUser`, `Add-LocalGroupMember`, `Get-LocalGroupMember`, `net user`, `whoami /groups`; onboarding, offboarding and account audits), with **Lab 06: Onboard & Offboard**.
+- **Module 1 test** (25 questions, 38 marks, collapsible answer key and practical task) in Assessments.
+- Command reference: new **Pipelines, History & Exit Codes** and **Users & Groups** categories for Linux and PowerShell, plus matching comparison tables.
+- Day 04 now links to Day 05; course, module, lab, schedule and assessment indexes updated.
+
 ## 2026-11-08 — v0.2.0 (nightly release: Days 03–04)
 
 - **Day 03** Reading and Managing Files (`cat`, `less`, `head`, `tail -F`, `wc`, `Get-Content -TotalCount/-Tail/-Wait`, `Measure-Object`, redirection, `Out-File`, `Tee-Object`, the six PowerShell streams, encodings and line endings), with **Lab 03: Log Reader**.

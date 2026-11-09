@@ -257,7 +257,7 @@ Platform: **Ubuntu 24.04 LTS**, Bash 5.2, GNU coreutils 9.4. Commands marked *GN
 | **Syntax** | `file FILE...` · `stat FILE...` |
 | **Example** | `file /usr/bin/ls` |
 | **Expected output** | `/usr/bin/ls: ELF 64-bit LSB pie executable, x86-64, ...` |
-| **Equivalent** | <code>Get-Item f &#124; Format-List *</code> (metadata); first bytes via `Get-Content -Encoding Byte -TotalCount 4` (5.1) / `-AsByteStream` (7) |
+| **Equivalent** | <code>Get-Item f &#124; Format-List &#42;</code> (metadata); first bytes via `Get-Content -Encoding Byte -TotalCount 4` (5.1) / `-AsByteStream` (7) |
 | **Common errors** | None common |
 | **Use case** | Spot executables disguised with document extensions. |
 | **Docs** | <https://man7.org/linux/man-pages/man1/file.1.html> · <https://man7.org/linux/man-pages/man1/stat.1.html> |
@@ -424,7 +424,7 @@ Platform: **Ubuntu 24.04 LTS**, Bash 5.2, GNU coreutils 9.4. Commands marked *GN
 | **Description** | Builds and runs command lines from items read on standard input. |
 | **Syntax** | `xargs [-0] [-r] [-n N] [-p] COMMAND [ARGS]` |
 | **Parameters** | `-0` NUL-separated input (pair with `find -print0`) · `-r` do nothing if input is empty · `-n N` at most N items per command · `-p` prompt before each run |
-| **Example** | <code>find . -name '*.tmp' -print0 &#124; xargs -0 -r rm -v</code> |
+| **Example** | <code>find . -name '&#42;.tmp' -print0 &#124; xargs -0 -r rm -v</code> |
 | **Expected output** | `removed './tmp/cache.tmp'` |
 | **Equivalent** | <code>&#124; ForEach-Object { ... }</code> / <code>&#124; Remove-Item</code> |
 | **Common errors** | Names with spaces split into pieces (use `-print0` / `-0`) |
@@ -460,3 +460,187 @@ Platform: **Ubuntu 24.04 LTS**, Bash 5.2, GNU coreutils 9.4. Commands marked *GN
 | **Common errors** | Using `which` in portable scripts (behaviour varies; ignores aliases and built-ins) |
 | **Use case** | Dependency checks at the start of scripts. |
 | **Docs** | <https://www.gnu.org/software/bash/manual/bash.html#Bash-Builtins> · <https://man7.org/linux/man-pages/man1/whereis.1.html> |
+
+## Pipelines, History & Exit Codes
+
+### whatis / apropos (man -f / man -k)
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (man-db). Minimized Ubuntu images and containers ship without manual pages |
+| **Description** | `whatis` prints the one-line description of pages with that exact name; `apropos` searches all page names and descriptions (regular expressions by default). |
+| **Syntax** | `whatis NAME...` · `apropos [-s SECTION] KEYWORD...` · `man -f NAME` · `man -k KEYWORD` |
+| **Parameters** | `-s 8` limit to a section · `-a` all keywords must match · `-e` exact word (apropos) |
+| **Example** | `man -k '^user'` |
+| **Expected output** | `useradd (8) - create a new user or update default new user information` … (example) |
+| **Equivalent** | `Get-Command *user*` · `Get-Help user` |
+| **Common errors** | `nothing appropriate` (database not built: `sudo mandb`) · "This system has been minimized…" (`sudo unminimize`) |
+| **Use case** | Discovering which command does a job on an offline server. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/apropos.1.html> · <https://man7.org/linux/man-pages/man1/whatis.1.html> |
+
+### history / fc
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash built-ins (interactive shells). Ubuntu's `~/.bashrc` sets `HISTCONTROL=ignoreboth`, `HISTSIZE=1000`, `HISTFILESIZE=2000`, `histappend` |
+| **Description** | Lists and manages the command history kept in memory and in `~/.bash_history`. `fc` lists or edits and re-runs entries. |
+| **Syntax** | `history [N]` · `history -d OFFSET` · `history -c` · `history -a` · `history -w` · `fc -l [FIRST [LAST]]` |
+| **Parameters** | `N` last N entries · `-d` delete an entry · `-c` clear memory list · `-a` append new lines to the file · `-w` write the whole list · variables `HISTFILE`, `HISTSIZE`, `HISTFILESIZE`, `HISTCONTROL`, `HISTIGNORE`, `HISTTIMEFORMAT` |
+| **Example** | `export HISTTIMEFORMAT='%F %T  '; history 5` |
+| **Expected output** | `8  2026-11-09 16:42:21  echo one` (example; entries are right-aligned) |
+| **Equivalent** | `Get-History` (session) · `(Get-PSReadLineOption).HistorySavePath` (file) |
+| **Common errors** | Other terminals' commands missing (written on exit; use `history -a`/`-n`) · secrets typed on the command line are stored in plain text |
+| **Use case** | Documenting a change window; incident responders reviewing user activity. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Bash-History-Builtins.html> |
+
+### History expansion (!! !n !$ ^a^b)
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash, interactive shells only (disabled in scripts; `set +H` turns it off) |
+| **Description** | Re-uses earlier commands or their arguments. |
+| **Syntax** | `!!` · `!N` · `!-N` · `!string` · `!$` · `!*` · `^old^new` · append `:p` to print only |
+| **Parameters** | `!!` previous command · `!N` entry N · `!-N` N commands back · `!string` most recent starting with string · `!$` last argument · `!*` all arguments · `:p` print without running |
+| **Example** | `sudo !!` |
+| **Expected output** | The previous command is printed, then run with `sudo` |
+| **Equivalent** | `Invoke-History` / `r` (whole command lines only) |
+| **Common errors** | `event not found` (`!` inside double quotes; use single quotes) · running an unexpected old command (check with `:p`) |
+| **Use case** | Re-running a command that failed for lack of privileges. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/History-Interaction.html> |
+
+### Pipes and control operators (| |& ; && ||)
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash (POSIX shells; <code>&#124;&amp;</code> is Bash 4+) |
+| **Description** | <code>&#124;</code> connects stdout to the next command's stdin; <code>&#124;&amp;</code> pipes stdout and stderr; `;` runs in sequence; `&&` runs the next only on success; <code>&#124;&#124;</code> only on failure. |
+| **Syntax** | <code>cmd1 &#124; cmd2</code> · <code>cmd1 &#124;&amp; cmd2</code> · `cmd1 ; cmd2` · `cmd1 && cmd2` · <code>cmd1 &#124;&#124; cmd2</code> |
+| **Parameters** | Group with `{ cmd1; cmd2; }` or run in a subshell with `( … )` |
+| **Example** | <code>cut -d' ' -f1 access.log &#124; sort &#124; uniq -c &#124; sort -rn &#124; head -n 3</code> |
+| **Expected output** | `97 10.0.0.8` / `60 203.0.113.50` / `49 10.0.0.5` (Lab 05 data) |
+| **Equivalent** | PowerShell <code>&#124;</code> (objects) · `;` · `&&` <code>&#124;&#124;</code> in PowerShell 7+ only |
+| **Common errors** | <code>a &amp;&amp; b &#124;&#124; c</code> is not if/else (`c` runs if `b` fails) · `uniq -c` without `sort` · stderr not piped without `2>&1` |
+| **Use case** | `cd /srv/app/tmp && rm -f ./*.tmp` so the deletion never runs in the wrong directory. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Pipelines.html> · <https://www.gnu.org/software/bash/manual/html_node/Lists.html> |
+
+### Exit status ($? PIPESTATUS pipefail)
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash. `$?` is POSIX; `PIPESTATUS` and `pipefail` are Bash (`pipefail` is also in POSIX 2024) |
+| **Description** | Every command returns 0–255: 0 success, 1 general failure, 2 misuse, 126 not executable, 127 not found, 128+N killed by signal N. |
+| **Syntax** | `echo $?` · `echo "${PIPESTATUS[@]}"` · `set -o pipefail` · `exit N` |
+| **Parameters** | `rc=$?` save immediately · `if ! cmd; then …` test a command · `set -o pipefail` pipeline fails if any stage fails |
+| **Example** | <code>false &#124; true; echo "$? ${PIPESTATUS[&#42;]}"</code> |
+| **Expected output** | `0 1 0` |
+| **Equivalent** | `$?` (Boolean) and `$LASTEXITCODE` (integer) in PowerShell |
+| **Common errors** | Reading `$?` after another command · ignoring failures hidden inside pipelines · scripts that always `exit 0` |
+| **Use case** | Monitoring checks that return 0 OK, 2 UNKNOWN, 3 threshold breached. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html> · <https://www.gnu.org/software/bash/manual/html_node/The-Set-Builtin.html> |
+
+## Users & Groups
+
+### id / groups
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (coreutils) |
+| **Description** | `id` prints the UID, primary GID and supplementary groups of a user; `groups` prints only group names. |
+| **Syntax** | `id [-u] [-g] [-G] [-n] [USER]` · `groups [USER]` |
+| **Parameters** | `-u` UID · `-g` primary GID · `-G` all group IDs · `-n` names instead of numbers |
+| **Example** | `id student` |
+| **Expected output** | `uid=1000(student) gid=1000(student) groups=1000(student),4(adm),27(sudo)` (example, shortened) |
+| **Equivalent** | `whoami /user /groups` · `Get-LocalGroupMember` |
+| **Common errors** | New group membership not shown in the current session (log out and in, or `newgrp`) |
+| **Use case** | Checking whether an account has `sudo` before granting access. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/id.1.html> · <https://man7.org/linux/man-pages/man1/groups.1.html> |
+
+### getent
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (glibc). Reads every configured source (files, LDAP, SSSD) via NSS |
+| **Description** | Queries the account databases (`passwd`, `group`, `shadow`, `hosts`) the way the system sees them. |
+| **Syntax** | `getent DATABASE [KEY...]` |
+| **Parameters** | `passwd NAME` · `group NAME` · `shadow NAME` (root) · exit 2 = key not found |
+| **Example** | `getent group sudo` |
+| **Expected output** | `sudo:x:27:student` (example) |
+| **Equivalent** | `Get-LocalUser` · `Get-LocalGroup` · `Get-LocalGroupMember` |
+| **Common errors** | Using `grep /etc/passwd` and missing directory (LDAP/AD) users |
+| **Use case** | Verifying that a user exists before and after offboarding. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/getent.1.html> |
+
+### useradd / adduser
+
+| Field | Detail |
+|---|---|
+| **OS** | `useradd`: all Linux (shadow). `adduser`: **Debian/Ubuntu-specific** friendly wrapper (interactive). Root required |
+| **Description** | Creates a local account. `useradd` does exactly what its options say (no home directory without `-m` on Ubuntu); `adduser` creates the home, copies `/etc/skel` and asks for a password. |
+| **Syntax** | `useradd [-m] [-s SHELL] [-c COMMENT] [-G GROUPS] [-e YYYY-MM-DD] NAME` · `adduser [--disabled-password] [--comment TEXT] NAME` |
+| **Parameters** | `-m` create home · `-s /bin/bash` shell · `-c` comment · `-G` supplementary groups · `-e` expiry date · `-u` UID · `-r` system account |
+| **Example** | `sudo useradd -m -s /bin/bash -c 'Lab Alice' lab-alice` |
+| **Expected output** | No output on success; `id lab-alice` → `uid=1001(lab-alice) gid=1001(lab-alice) groups=1001(lab-alice)` (example) |
+| **Equivalent** | `New-LocalUser` · `net user NAME /add` |
+| **Common errors** | `user 'x' already exists` · account without home or with `/bin/sh` (forgot `-m`/`-s`) · `Permission denied` (needs `sudo`) |
+| **Use case** | Onboarding a new team member or service account. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/useradd.8.html> · <https://manpages.ubuntu.com/manpages/noble/man8/adduser.8.html> |
+
+### usermod
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (shadow). Root required |
+| **Description** | Changes an existing account: groups, shell, comment, expiry, lock state, login name. |
+| **Syntax** | `usermod [-a -G GROUPS] [-s SHELL] [-c COMMENT] [-e DATE] [-L] [-U] [-l NEWNAME] NAME` |
+| **Parameters** | `-aG` **append** to supplementary groups · `-G` alone **replaces** them · `-L`/`-U` lock/unlock password · `-e 1` expire immediately · `-s /usr/sbin/nologin` |
+| **Example** | `sudo usermod -aG lab-devs lab-alice` |
+| **Expected output** | No output; `id -nG lab-alice` → `lab-alice lab-devs` (example) |
+| **Equivalent** | `Add-LocalGroupMember` · `Set-LocalUser` · `Disable-LocalUser` |
+| **Common errors** | `-G` without `-a` silently removes other groups (including `sudo`) · `user X is currently used by process N` when renaming |
+| **Use case** | Granting a team group; disabling an account during offboarding. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/usermod.8.html> |
+
+### passwd / chage
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (shadow). Changing another user's settings requires root |
+| **Description** | `passwd` sets, locks, unlocks, expires and reports passwords; `chage` sets password ageing and account expiry. |
+| **Syntax** | `passwd [-l] [-u] [-e] [-S] [USER]` · `chage [-l] [-M DAYS] [-W DAYS] [-E YYYY-MM-DD] USER` |
+| **Parameters** | `-l` lock · `-u` unlock · `-e` force change at next login · `-S` status (`P`, `L`, `NP`) · `chage -l` list · `-M` maximum age · `-W` warning days · `-E` account expiry (`-1` = never) |
+| **Example** | `sudo chage -E 2026-12-31 lab-bob; sudo chage -l lab-bob` |
+| **Expected output** | `Account expires : Dec 31, 2026` (example) |
+| **Equivalent** | `Set-LocalUser -AccountExpires` · `-PasswordNeverExpires` · `Disable-LocalUser` · `net accounts` |
+| **Common errors** | `passwd -l` does not block SSH key logins (also expire the account or set `nologin`) · typing passwords as arguments to scripts |
+| **Use case** | Contractor accounts that end on a fixed date. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/passwd.1.html> · <https://man7.org/linux/man-pages/man1/chage.1.html> |
+
+### userdel
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (shadow). Root required |
+| **Description** | Deletes an account. By default the home directory and mail spool are **kept**; `-r` removes them. |
+| **Syntax** | `userdel [-r] NAME` |
+| **Parameters** | `-r` remove home and mail spool · `-f` force (even if logged in; avoid) |
+| **Example** | `sudo userdel lab-bob` (after archiving `/home/lab-bob`) |
+| **Expected output** | No output; `getent passwd lab-bob` returns nothing (exit 2) |
+| **Equivalent** | `Remove-LocalUser` (profile folder is kept) |
+| **Common errors** | `user lab-bob is currently used by process N` · deleting with `-r` before preserving data · orphaned files (`find / -nouser`) |
+| **Use case** | Final step of offboarding, after a disable period. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/userdel.8.html> |
+
+### groupadd / groupdel / gpasswd
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (shadow). Root required to change groups |
+| **Description** | Create and delete groups; add or remove single members, or set the full member list. |
+| **Syntax** | `groupadd [-g GID] NAME` · `groupdel NAME` · `gpasswd -a USER GROUP` · `gpasswd -d USER GROUP` · `gpasswd -M USER1,USER2 GROUP` |
+| **Parameters** | `-g` choose GID · `-a` add · `-d` delete · `-M` set members (replaces the list) |
+| **Example** | `sudo groupadd lab-devs && sudo gpasswd -a lab-bob lab-devs` |
+| **Expected output** | `Adding user lab-bob to group lab-devs` |
+| **Equivalent** | `New-LocalGroup` · `Add-LocalGroupMember` · `Remove-LocalGroupMember` |
+| **Common errors** | `groupdel: cannot remove the primary group of user 'x'` · `group 'x' already exists` |
+| **Use case** | Role-based access: grant a team group instead of individual users. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/groupadd.8.html> · <https://man7.org/linux/man-pages/man1/gpasswd.1.html> |

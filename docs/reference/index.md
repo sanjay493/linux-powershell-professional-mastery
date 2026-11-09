@@ -52,8 +52,8 @@ A searchable reference for every command taught in the course. Use the **search 
 | Help & discovery | :material-check: | :material-check: | Day 1 |
 | Reading files, redirection | :material-check: | :material-check: | Day 3 |
 | Searching | :material-check: | :material-check: | Day 4 |
-| Pipelines & history | Day 5 | Day 5 | |
-| Users & groups | Day 6 | Day 6 | |
+| Pipelines, history & exit codes | :material-check: | :material-check: | Day 5 |
+| Users & groups | :material-check: | :material-check: | Day 6 |
 | Permissions | Day 7 | Day 7 | |
 | Processes & services | Day 8 | Day 8 | |
 | Storage | Day 9 | Day 9 | |

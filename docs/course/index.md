@@ -17,13 +17,13 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 | 02 | [File and Directory Management](module-1/day-02.md) | `cd` `mkdir` `touch` `cp` `mv` `rm` · `Set-Location` `New-Item` `Copy-Item` `Move-Item` `Remove-Item` |
 | 03 | [Reading and Managing Files](module-1/day-03.md) | `cat` `less` `head` `tail` `wc` · `Get-Content` `Select-Object` `Measure-Object` · redirection |
 | 04 | [Searching Files and Text](module-1/day-04.md) | `find` `grep` `locate` `which` · `Get-ChildItem` `Select-String` `Where-Object` · regex |
-| 05 | Command Help, History and Pipelines | `man` `history` `type` · `Get-Help` `Get-Command` `Get-History` · pipelines, exit codes |
+| 05 | [Command Help, History and Pipelines](module-1/day-05.md) | `man` `history` `type` · `Get-Help` `Get-Command` `Get-History` · pipelines, exit codes |
 
 ## Module 2 — [System Administration](module-2/index.md)
 
 | Day | Lesson | Key commands |
 |---|---|---|
-| 06 | Users and Groups | `useradd` `usermod` `passwd` `id` `groups` · `Get-LocalUser` `New-LocalUser` `Add-LocalGroupMember` |
+| 06 | [Users and Groups](module-2/day-06.md) | `useradd` `usermod` `passwd` `id` `groups` · `Get-LocalUser` `New-LocalUser` `Add-LocalGroupMember` |
 | 07 | File Permissions and Access Control | `chmod` `chown` `umask` · `Get-Acl` `Set-Acl` `icacls` |
 | 08 | Processes and Services | `ps` `top` `htop` `kill` `systemctl` · `Get-Process` `Stop-Process` `Get-Service` |
 | 09 | Disk and Storage Management | `df` `du` `lsblk` `mount` `findmnt` · `Get-Disk` `Get-Volume` `Get-PSDrive` |

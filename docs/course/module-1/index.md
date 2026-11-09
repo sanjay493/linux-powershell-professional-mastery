@@ -23,6 +23,6 @@ You will learn what shells are, move around the filesystem, create and manage fi
 | 02 | [File and Directory Management](day-02.md) | [Lab 02](../../labs/lab-02.md) | Published |
 | 03 | [Reading and Managing Files](day-03.md) | [Lab 03](../../labs/lab-03.md) | Published |
 | 04 | [Searching Files and Text](day-04.md) | [Lab 04](../../labs/lab-04.md) | Published |
-| 05 | Command Help, History and Pipelines | Lab 05 | 2026-11-09 22:00 IST |
+| 05 | [Command Help, History and Pipelines](day-05.md) | [Lab 05](../../labs/lab-05.md) | Published |
 
-**Module test:** released with Day 05 in [Assessments](../../assessments/index.md).
+**Module test:** [Module 1 Test](../../assessments/module-1-test.md) (25 questions with answer key; also listed in [Assessments](../../assessments/index.md)).

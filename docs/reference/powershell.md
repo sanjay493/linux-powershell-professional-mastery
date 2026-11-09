@@ -176,7 +176,7 @@ Platforms: **Windows PowerShell 5.1** (Windows 11) and **PowerShell 7.4+** (Wind
 | **Version / OS** | 5.1, 7.x · all OS. Aliases: `move`, `mv` (Windows), `mi` / `ren`, `rni` |
 | **Description** | `Move-Item` moves (and can rename); `Rename-Item` renames in place. |
 | **Syntax** | `Move-Item [-Path] <String[]> [[-Destination] <String>] [-Force]` · `Rename-Item [-Path] <String> [-NewName] <String>` |
-| **Example** | <code>Get-ChildItem *.log &#124; Rename-Item -NewName { $PSItem.BaseName + '-old' + $PSItem.Extension }</code> |
+| **Example** | <code>Get-ChildItem &#42;.log &#124; Rename-Item -NewName { $PSItem.BaseName + '-old' + $PSItem.Extension }</code> |
 | **Expected output** | `app.log` → `app-old.log` (no output by default) |
 | **Equivalent** | `mv` |
 | **Common errors** | `Cannot create a file when that file already exists` (`Move-Item` without `-Force`) · `-NewName` given a path |
@@ -232,7 +232,7 @@ Platforms: **Windows PowerShell 5.1** (Windows 11) and **PowerShell 7.4+** (Wind
 | **Description** | Reads a file and emits one string object per line (or one string with `-Raw`). |
 | **Syntax** | `Get-Content [-Path] <String[]> [-TotalCount <Int64>] [-Tail <Int32>] [-Wait] [-Raw] [-ReadCount <Int64>] [-Encoding <Encoding>] [-LiteralPath <String[]>]` |
 | **Parameters** | `-TotalCount` (`-First`, `-Head`) first N lines · `-Tail` (`-Last`) last N lines · `-Wait` follow new lines · `-Raw` whole file as one string · `-ReadCount` batch size · `-Encoding` · `-AsByteStream` (7; 5.1 uses `-Encoding Byte`) |
-| **Example** | <code>Get-Content C:\Logs\app.log -Tail 0 -Wait &#124; Where-Object { $_ -match 'ERROR' }</code> |
+| **Example** | <code>Get-Content C:\Logs\app.log -Tail 0 -Wait &#124; Where-Object { $&#95; -match 'ERROR' }</code> |
 | **Expected output** | New `ERROR` lines as they are written (Ctrl+C to stop) |
 | **Equivalent** | `cat`, `head`, `tail`, `tail -f` |
 | **Common errors** | `Cannot find path ...` · file locked by another process · `-Wait` without `-Tail` prints the whole file first · `cat -n` fails on Windows (alias) |
@@ -354,7 +354,7 @@ Platforms: **Windows PowerShell 5.1** (Windows 11) and **PowerShell 7.4+** (Wind
 | **Description** | Searches text in files or input strings with .NET regular expressions. **Case-insensitive by default.** Returns `MatchInfo` objects (`Path`, `LineNumber`, `Line`, `Matches`). |
 | **Syntax** | `Select-String [-Pattern] <String[]> [-Path] <String[]> [-SimpleMatch] [-CaseSensitive] [-NotMatch] [-Context <Int32[]>] [-List] [-AllMatches] [-Quiet]` |
 | **Parameters** | `-SimpleMatch` literal · `-CaseSensitive` · `-NotMatch` invert · `-Context B,A` · `-List` first match per file · `-AllMatches` · `-Quiet` True/False · `-Include`/`-Exclude` |
-| **Example** | <code>Get-ChildItem C:\inetpub\logs -Recurse -Filter *.log &#124; Select-String -Pattern ' 500 ' -List &#124; Select-Object Path</code> |
+| **Example** | <code>Get-ChildItem C:\inetpub\logs -Recurse -Filter &#42;.log &#124; Select-String -Pattern ' 500 ' -List &#124; Select-Object Path</code> |
 | **Expected output** | Paths of IIS log files containing HTTP 500 responses (example) |
 | **Equivalent** | `grep` (case-sensitive by default) |
 | **Common errors** | No `-Recurse` parameter (pipe from `Get-ChildItem`) · regex characters in literal text (use `-SimpleMatch`) · `Unterminated [] set` |
@@ -390,3 +390,234 @@ Platforms: **Windows PowerShell 5.1** (Windows 11) and **PowerShell 7.4+** (Wind
 | **Common errors** | Typing `where` without `.exe` (alias for `Where-Object`) |
 | **Use case** | Discovering which copy of a tool is first in `PATH`. |
 | **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/where> |
+
+## Pipelines, History & Error Handling
+
+### Get-Member
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Alias: `gm` |
+| **Description** | Shows the .NET type name, properties and methods of the objects in the pipeline. |
+| **Syntax** | `Get-Member [[-Name] <String[]>] [-MemberType <PSMemberTypes>] [-Static] [-Force]` |
+| **Parameters** | `-MemberType Property` / `Method` / `NoteProperty` · `-Name` filter member names · `-Static` static members of the type |
+| **Example** | <code>Get-Process &#124; Get-Member -MemberType Property</code> |
+| **Expected output** | `TypeName: System.Diagnostics.Process` followed by `CPU`, `Id`, `WorkingSet64` … (example) |
+| **Equivalent** | None in Bash (text has no members); read the command's man page for the output format |
+| **Common errors** | Piping a `Format-*` result shows `FormatStartData` instead of the real type |
+| **Use case** | Finding the property to sort, filter or export on. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-member> |
+
+### Get-History / Invoke-History / Clear-History
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Aliases: `h`, `history`, `ghy` · `r`, `ihy` · `clhy` |
+| **Description** | List, re-run or clear the **current session's** history. Entries are `HistoryInfo` objects with `Id`, `CommandLine`, `ExecutionStatus`, `StartExecutionTime`, `EndExecutionTime`. |
+| **Syntax** | `Get-History [[-Id] <Int64[]>] [[-Count] <Int32>]` · `Invoke-History [[-Id] <String>]` · `Clear-History [[-Id] <Int32[]>] [[-Count] <Int32>]` |
+| **Parameters** | `-Count N` last N entries · `-Id` specific entries · `Invoke-History` with no Id re-runs the last command |
+| **Example** | <code>Get-History -Count 40 &#124; Export-Csv change-1234.csv -NoTypeInformation</code> |
+| **Expected output** | A CSV with one row per command (example) |
+| **Equivalent** | `history`, `!N`, `history -c` |
+| **Common errors** | Empty in a new window (session only) · `Clear-History` does not clear the PSReadLine file |
+| **Use case** | Attaching the exact commands of a change to the ticket. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/get-history> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/invoke-history> |
+
+### PSReadLine history (Get-PSReadLineOption)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | PSReadLine module: 2.0 with Windows PowerShell 5.1 on Windows 10/11; 2.x with PowerShell 7 on all OS |
+| **Description** | PSReadLine saves command lines from **all** sessions to a text file and provides ++ctrl+r++ / ++f8++ history search. It tries not to save lines containing `password`, `asplaintext`, `token`, `apikey` or `secret` (best effort). |
+| **Syntax** | `(Get-PSReadLineOption).HistorySavePath` · `Set-PSReadLineOption -HistorySaveStyle SaveIncrementally` |
+| **Parameters** | `HistorySavePath` file location · `MaximumHistoryCount` · `HistorySaveStyle` (`SaveIncrementally`, `SaveAtExit`, `SaveNothing`) |
+| **Example** | <code>Get-Content (Get-PSReadLineOption).HistorySavePath &#124; Select-String 'Invoke-WebRequest'</code> |
+| **Expected output** | Matching earlier command lines (example) |
+| **Equivalent** | `~/.bash_history` |
+| **Common errors** | Not available in hosts without PSReadLine (for example the ISE) · secrets saved by older versions |
+| **Use case** | Incident responders collecting `ConsoleHost_history.txt` from each user profile. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/psreadline/about/about_psreadline> |
+
+### Group-Object
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Alias: `group` |
+| **Description** | Groups objects by one or more property values and counts each group. |
+| **Syntax** | `Group-Object [[-Property] <Object[]>] [-NoElement] [-AsHashTable] [-CaseSensitive]` |
+| **Parameters** | `-NoElement` omit the `Group` column · `-AsHashTable` lookup table · several properties: `Group-Object IP, Path` |
+| **Example** | <code>$requests &#124; Group-Object IP -NoElement &#124; Sort-Object Count -Descending &#124; Select-Object -First 3</code> |
+| **Expected output** | `Count Name` / `97 10.0.0.8` / `60 203.0.113.50` / `49 10.0.0.5` (Lab 05 data) |
+| **Equivalent** | <code>sort &#124; uniq -c &#124; sort -rn</code> |
+| **Common errors** | Grouping strings from native commands (parse into objects first) |
+| **Use case** | Top talkers, top error codes, logons per account. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/group-object> |
+
+### Pipeline chain operators (&& ||)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **PowerShell 7.0+ only**, all OS. A parser error in Windows PowerShell 5.1 |
+| **Description** | `a && b` runs `b` only if `$?` is `True` after `a`; <code>a &#124;&#124; b</code> runs `b` only if `$?` is `False`. |
+| **Syntax** | `<pipeline> && <pipeline>` · <code>&lt;pipeline&gt; &#124;&#124; &lt;pipeline&gt;</code> |
+| **Parameters** | — |
+| **Example** | <code>Get-Item C:\missing.txt -ErrorAction SilentlyContinue &#124;&#124; 'not found'</code> |
+| **Expected output** | `not found` |
+| **Equivalent** | Bash `&&` <code>&#124;&#124;</code>; in 5.1 use `a; if ($?) { b }` |
+| **Common errors** | `The token '&&' is not a valid statement separator in this version.` (5.1) · `Test-Path x && …` runs anyway (`Test-Path` succeeds and returns `False`) |
+| **Use case** | Short success/failure chains in PowerShell 7 scripts and prompts. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_pipeline_chain_operators> |
+
+### $? / $LASTEXITCODE / $Error
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS (automatic variables) |
+| **Description** | `$?` is `True`/`False` for the last command; `$LASTEXITCODE` is the integer exit code of the last native program or script `exit`; `$Error` holds recent error records (`$Error[0]` newest). |
+| **Syntax** | `$?` · `$LASTEXITCODE` · `$Error[0]` · `exit <Int32>` |
+| **Parameters** | PowerShell 7.4+: `$PSNativeCommandUseErrorActionPreference = $true` turns non-zero native exit codes into errors |
+| **Example** | `ping.exe -n 1 192.0.2.1 > $null; "$? $LASTEXITCODE"` |
+| **Expected output** | `False 1` (example) |
+| **Equivalent** | Bash `$?` (integer) and `${PIPESTATUS[@]}` |
+| **Common errors** | Testing `$LASTEXITCODE` after a cmdlet (it is not updated) · reading `$?` after another command |
+| **Use case** | Scripts that call native tools (`git`, `robocopy`, `ping.exe`) and must react to their exit codes. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_automatic_variables> |
+
+### try / catch / finally and -ErrorAction
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | `try`/`catch` handles **terminating** errors; `-ErrorAction Stop` makes a cmdlet's non-terminating error terminating; `finally` always runs. |
+| **Syntax** | `try { <cmd> -ErrorAction Stop } catch [<ExceptionType>] { <handler> } finally { <cleanup> }` |
+| **Parameters** | `-ErrorAction` (`-ea`): `Continue`, `SilentlyContinue`, `Stop`, `Inquire`, `Ignore` · `$ErrorActionPreference` · `-ErrorVariable name` |
+| **Example** | `try { Get-Content C:\nope.txt -ErrorAction Stop } catch { "Failed: $($PSItem.Exception.Message)" }` |
+| **Expected output** | `Failed: Cannot find path 'C:\nope.txt' because it does not exist.` |
+| **Equivalent** | Bash `if ! cmd; then …; fi` and exit-code checks |
+| **Common errors** | `catch` never runs without `-ErrorAction Stop` · `SilentlyContinue` hides problems you needed to see |
+| **Use case** | Reliable scripts that log a clear message and exit with a code when an input is missing. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_try_catch_finally> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_commonparameters> |
+
+## Users & Groups
+
+All `*-Local*` cmdlets are in the **`Microsoft.PowerShell.LocalAccounts`** module: **Windows only**, built into Windows PowerShell 5.1 (64-bit) and usable from PowerShell 7 on Windows (fall back to 5.1 or `Import-Module Microsoft.PowerShell.LocalAccounts -UseWindowsPowerShell` if the import fails). Changes need an elevated session.
+
+### Get-LocalUser
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Alias: `glu`. No elevation needed |
+| **Description** | Lists local accounts as `LocalUser` objects (`Name`, `Enabled`, `Description`, `SID`, `PasswordLastSet`, `LastLogon`, `AccountExpires`…). |
+| **Syntax** | `Get-LocalUser [[-Name] <String[]>]` · `Get-LocalUser -SID <SecurityIdentifier[]>` |
+| **Parameters** | `-Name` (wildcards) · `-SID` |
+| **Example** | <code>Get-LocalUser &#124; Select-Object Name, Enabled, LastLogon, PasswordLastSet</code> |
+| **Expected output** | `Administrator False` · `student True 09-11-2026 …` (example) |
+| **Equivalent** | `getent passwd` · `cut -d: -f1 /etc/passwd` |
+| **Common errors** | `The term 'Get-LocalUser' is not recognized` (Linux/macOS or 32-bit PowerShell) |
+| **Use case** | Auditing local accounts on a workstation or server. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/get-localuser> |
+
+### New-LocalUser
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Alias: `nlu`. **Elevation required** |
+| **Description** | Creates a local account. `-Password` accepts only a `SecureString`. Names up to 20 characters, descriptions up to 48. |
+| **Syntax** | `New-LocalUser [-Name] <String> -Password <SecureString> [-FullName <String>] [-Description <String>] [-AccountExpires <DateTime>] [-PasswordNeverExpires] [-Disabled]` · `New-LocalUser [-Name] <String> -NoPassword` |
+| **Parameters** | `-Password` · `-NoPassword` · `-FullName` · `-Description` · `-AccountExpires` / `-AccountNeverExpires` · `-PasswordNeverExpires` · `-UserMayNotChangePassword` · `-Disabled` |
+| **Example** | `New-LocalUser -Name lab-alice -Password (Read-Host -AsSecureString 'Password') -Description 'LAB account'` |
+| **Expected output** | `Name Enabled Description` / `lab-alice True LAB account` (example) |
+| **Equivalent** | `useradd -m` / `adduser` · `net user NAME /add` |
+| **Common errors** | `Cannot convert 'System.String' to 'System.Security.SecureString'` (plain-text password) · `Access denied` (not elevated) · password policy errors |
+| **Use case** | Creating a local break-glass or lab account. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/new-localuser> |
+
+### Set-LocalUser / Rename-LocalUser
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Aliases: `slu`, `rnlu`. **Elevation required** |
+| **Description** | Changes description, password, expiry and password options; `Rename-LocalUser` changes the name and keeps the SID. |
+| **Syntax** | `Set-LocalUser [-Name] <String> [-Description <String>] [-Password <SecureString>] [-AccountExpires <DateTime>] [-AccountNeverExpires] [-PasswordNeverExpires <Boolean>] [-UserMayChangePassword <Boolean>]` |
+| **Parameters** | `-PasswordNeverExpires` and `-UserMayChangePassword` take `$true`/`$false` (not switches) · `-WhatIf` |
+| **Example** | `Set-LocalUser -Name lab-bob -AccountExpires (Get-Date '2026-12-31')` |
+| **Expected output** | No output on success |
+| **Equivalent** | `usermod -c`, `chage -E`, `passwd` |
+| **Common errors** | Passing `-PasswordNeverExpires` without a value |
+| **Use case** | Time-limited contractor accounts. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/set-localuser> |
+
+### Disable-LocalUser / Enable-LocalUser
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Aliases: `dlu`, `elu`. **Elevation required** |
+| **Description** | Blocks or re-allows sign-in for an account without deleting it. |
+| **Syntax** | `Disable-LocalUser [-Name] <String[]>` · `Enable-LocalUser [-Name] <String[]>` |
+| **Parameters** | `-Name` · `-SID` · `-InputObject` (pipeline) · `-WhatIf` |
+| **Example** | <code>Get-LocalUser lab-&#42; &#124; Disable-LocalUser -WhatIf</code> |
+| **Expected output** | `What if: Performing the operation "Disable local user" on target "lab-alice".` (example) |
+| **Equivalent** | `usermod -L -e 1` / `passwd -l` plus expiry |
+| **Common errors** | Disabling the only administrator account |
+| **Use case** | First step of offboarding: disable, keep for the retention period, then delete. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/disable-localuser> |
+
+### Remove-LocalUser
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Alias: `rlu`. **Elevation required** |
+| **Description** | Deletes a local account. The profile folder in `C:\Users` and the user's files are **not** removed. |
+| **Syntax** | `Remove-LocalUser [-Name] <String[]> [-WhatIf] [-Confirm]` |
+| **Parameters** | `-Name` · `-SID` · `-InputObject` · `-WhatIf` |
+| **Example** | `Remove-LocalUser -Name lab-bob -WhatIf` |
+| **Expected output** | `What if: Performing the operation "Remove local user" on target "lab-bob".` (example) |
+| **Equivalent** | `userdel` (home kept unless `-r`) |
+| **Common errors** | Files left owned by an unresolvable SID (take ownership or archive first) |
+| **Use case** | Final offboarding step after data has been preserved. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/remove-localuser> |
+
+### Get-LocalGroup / New-LocalGroup
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Aliases: `glg`, `nlg`. `New-LocalGroup` needs elevation |
+| **Description** | Lists or creates local groups (`Administrators`, `Users`, `Remote Desktop Users`, custom groups). |
+| **Syntax** | `Get-LocalGroup [[-Name] <String[]>]` · `New-LocalGroup [-Name] <String> [-Description <String>]` |
+| **Parameters** | `-Name` (wildcards for `Get-`) · `-SID` · `-Description` |
+| **Example** | `New-LocalGroup -Name lab-devs -Description 'LAB group'` |
+| **Expected output** | `Name Description` / `lab-devs LAB group` (example) |
+| **Equivalent** | `getent group` · `groupadd` |
+| **Common errors** | Name already exists · not elevated |
+| **Use case** | Role groups for shared folders (Day 07). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/get-localgroup> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/new-localgroup> |
+
+### Add-LocalGroupMember / Remove-LocalGroupMember / Get-LocalGroupMember
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Aliases: `algm`, `rlgm`, `glgm`. Changes need elevation |
+| **Description** | Add, remove or list members (local users, local groups, domain or Microsoft accounts) of a local group. |
+| **Syntax** | `Add-LocalGroupMember [-Group] <String> [-Member] <LocalPrincipal[]>` · `Remove-LocalGroupMember [-Group] <String> [-Member] <LocalPrincipal[]>` · `Get-LocalGroupMember [-Group] <String>` |
+| **Parameters** | `-Group` · `-Member` (names or SIDs) · `-WhatIf` |
+| **Example** | `Get-LocalGroupMember -Group Administrators` |
+| **Expected output** | `ObjectClass Name PrincipalSource` / `User WIN11-LAB\student Local` (example) |
+| **Equivalent** | `usermod -aG` / `gpasswd -a` / `gpasswd -d` / `getent group` |
+| **Common errors** | `is already a member of group` · listing can fail when the group contains an unresolvable (orphaned) SID; `net localgroup NAME` still works |
+| **Use case** | Auditing who has local administrator rights. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/add-localgroupmember> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/get-localgroupmember> |
+
+### whoami /groups · net user · net localgroup
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows only (external programs, every PowerShell version) |
+| **Description** | `whoami /user /groups /priv` shows your SID, group memberships (including integrity level) and privileges; `net user` and `net localgroup` show and change accounts and groups. |
+| **Syntax** | `whoami [/user] [/groups] [/priv]` · `net user [NAME]` · `net localgroup [GROUP]` · `net accounts` |
+| **Parameters** | `/fo csv` CSV output for `whoami` · `net user NAME /active:no` disable |
+| **Example** | <code>whoami /groups /fo csv &#124; ConvertFrom-Csv</code> |
+| **Expected output** | Objects with `Group Name`, `Type`, `SID`, `Attributes` (example) |
+| **Equivalent** | `id` · `sudo -l` · `getent` · `chage -l` |
+| **Common errors** | Passwords typed as `net user NAME P@ss /add` end up in history (use `*` to be prompted) |
+| **Use case** | Quick checks on systems without the LocalAccounts module, and checking whether a session is elevated. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/whoami> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/net-user> |

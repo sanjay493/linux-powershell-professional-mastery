@@ -132,10 +132,12 @@ nav:
           - "Day 02: File & Directory Management": course/module-1/day-02.md
           - "Day 03: Reading & Managing Files": course/module-1/day-03.md
           - "Day 04: Searching Files & Text": course/module-1/day-04.md
+          - "Day 05: Command Help, History & Pipelines": course/module-1/day-05.md
           # <<< DAYS module-1
       - "Module 2: System Administration":
           - course/module-2/index.md
           # >>> DAYS module-2
+          - "Day 06: Users & Groups": course/module-2/day-06.md
           # <<< DAYS module-2
       - "Module 3: Networking & Troubleshooting":
           - course/module-3/index.md
@@ -165,6 +167,8 @@ nav:
       - "Lab 02: Project Workspace": labs/lab-02.md
       - "Lab 03: Log Reader": labs/lab-03.md
       - "Lab 04: Needle in the Haystack": labs/lab-04.md
+      - "Lab 05: Pipeline Builder": labs/lab-05.md
+      - "Lab 06: Onboard & Offboard": labs/lab-06.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md
@@ -176,6 +180,7 @@ nav:
       - Script Library: projects/scripts.md
   - Assessments:
       - assessments/index.md
+      - "Module 1 Test": assessments/module-1-test.md
   - Downloads:
       - downloads/index.md
   - About:
