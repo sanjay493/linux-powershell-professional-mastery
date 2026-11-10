@@ -1122,4 +1122,4 @@ net user NAME ; net localgroup Administrators ; net accounts
 
 ---
 
-**Previous:** [Day 05: Command Help, History and Pipelines](../module-1/day-05.md) · **Next:** Day 07: File Permissions and Access Control (see the [release schedule](../schedule.md))
+**Previous:** [Day 05: Command Help, History and Pipelines](../module-1/day-05.md) · **Next:** [Day 07: File Permissions and Access Control](day-07.md)

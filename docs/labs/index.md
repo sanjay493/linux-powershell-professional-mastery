@@ -17,8 +17,8 @@ Every day has a dedicated lab. Each lab includes a **Lab ID, objective, required
 | [LAB-04](lab-04.md) | Needle in the Haystack | 04 | Find files and error patterns across a directory tree | Published |
 | [LAB-05](lab-05.md) | Pipeline Builder | 05 | Answer NOC questions about a web log with text and object pipelines; write an OK/ALERT check with exit codes | Published |
 | [LAB-06](lab-06.md) | Onboard & Offboard | 06 | Create, modify, lock and audit lab users | Published |
-| LAB-07 | Lock It Down | 07 | Fix an over-permissive shared folder (with backup) | 2026-11-10 |
-| LAB-08 | Runaway Process | 08 | Identify a high-CPU process and an inactive service | 2026-11-10 |
+| [LAB-07](lab-07.md) | Lock It Down | 07 | Fix an over-permissive shared folder (with backup) | Published |
+| [LAB-08](lab-08.md) | Runaway Process | 08 | Identify a high-CPU process and an inactive service | Published |
 | LAB-09 | Disk Full | 09 | Find what is consuming disk space | 2026-11-11 |
 | LAB-10 | Software Inventory | 10 | Inventory, install and update packages safely | 2026-11-11 |
 | LAB-11 – LAB-15 | Networking labs | 11–15 | IP, connectivity, DNS failure, port 443 owner, packet capture | 2026-11-12 → 14 |

@@ -16,6 +16,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 04 | [Searching Files and Text](../course/module-1/day-04.md#quiz) |
 | 05 | [Command Help, History and Pipelines](../course/module-1/day-05.md#quiz) |
 | 06 | [Users and Groups](../course/module-2/day-06.md#quiz) |
+| 07 | [File Permissions and Access Control](../course/module-2/day-07.md#quiz) |
+| 08 | [Processes and Services](../course/module-2/day-08.md#quiz) |
 
 ## Module tests
 

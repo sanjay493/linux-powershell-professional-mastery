@@ -54,8 +54,8 @@ A searchable reference for every command taught in the course. Use the **search 
 | Searching | :material-check: | :material-check: | Day 4 |
 | Pipelines, history & exit codes | :material-check: | :material-check: | Day 5 |
 | Users & groups | :material-check: | :material-check: | Day 6 |
-| Permissions | Day 7 | Day 7 | |
-| Processes & services | Day 8 | Day 8 | |
+| Permissions | :material-check: | :material-check: | Day 7 |
+| Processes & services | :material-check: | :material-check: | Day 8 |
 | Storage | Day 9 | Day 9 | |
 | Packages | Day 10 | Day 10 | |
 | Networking, DNS | Days 11–15 | Days 11–15 | |

@@ -6,6 +6,14 @@ description: "Release history of the course."
 
 All notable changes are listed here, newest first. Nightly releases add two days each.
 
+## 2026-11-10 — v0.4.0 (nightly release: Days 07–08)
+
+- **Day 07** File Permissions and Access Control (`ls -l`/`stat` permission strings, `chmod` numeric and symbolic incl. `X`, `chown`, `chgrp`, `umask` (0022 vs 0002 via `pam_umask`), setuid/setgid/sticky bits, `find -perm` audits, POSIX ACLs with `getfacl`/`setfacl` and `getfacl -R` backups, `chattr`/`lsattr`; NTFS DACLs, ACEs, inheritance and deny precedence, `Get-Acl`, `Set-Acl`, `FileSystemAccessRule`, `SetAccessRuleProtection`, `icacls /save /restore /grant /remove /inheritance`, `takeown`), with **Lab 07: Lock It Down**.
+- **Day 08** Processes and Services (PIDs, process states, jobs, `ps`, `top`, `htop`, `pgrep`/`pkill`, signals and `kill`, `nice`/`renice`, `/proc/PID`, `systemctl`, `journalctl -u`; `Get-Process`, `Stop-Process`, `Start-Process`, `Wait-Process`, `Win32_Process` command lines, `Get-Service`, `Start/Stop/Restart-Service`, `Set-Service`, `sc.exe`, `tasklist`/`taskkill`, Service Control Manager events), with **Lab 08: Runaway Process**.
+- New scripts: **`process-monitor.sh`** and **`Process-Monitor.ps1`** (top processes by sampled CPU and memory, thresholds, text/CSV(/JSON) output, exit code 3 on breach), documented in the Script Library.
+- Command reference: new **Permissions** and **Processes & Services** categories for Linux and PowerShell, plus matching comparison tables.
+- Day 06 now links to Day 07; course, module, lab, schedule and assessment indexes updated.
+
 ## 2026-11-09 — v0.3.0 (nightly release: Days 05–06)
 
 - **Day 05** Command Help, History and Pipelines (`man` sections, `man -k`/`-f`, `--help`, `help`, `type -a`, `command -v`, `history`, `fc`, history expansion, `HISTCONTROL`/`HISTTIMEFORMAT`; `Get-Help -Examples/-Parameter/-Online`, `Get-Command -All/-ParameterName`, `Get-Alias -Definition`, `Get-Member`, `Get-History`, `Invoke-History`, PSReadLine history; text vs object pipelines, `;` `&&` `||` (PowerShell 7+), `$?`, `PIPESTATUS`, `pipefail`, `$LASTEXITCODE`, `-ErrorAction`, `try`/`catch`/`finally`), with **Lab 05: Pipeline Builder**.

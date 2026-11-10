@@ -20,8 +20,8 @@ You will manage accounts, control access with Linux permissions and Windows NTFS
 | Day | Lesson | Lab | Status |
 |---|---|---|---|
 | 06 | [Users and Groups](day-06.md) | [Lab 06](../../labs/lab-06.md) | Published |
-| 07 | File Permissions and Access Control | Lab 07 | 2026-11-10 22:00 IST |
-| 08 | Processes and Services | Lab 08 | 2026-11-10 22:00 IST |
+| 07 | [File Permissions and Access Control](day-07.md) | [Lab 07](../../labs/lab-07.md) | Published |
+| 08 | [Processes and Services](day-08.md) | [Lab 08](../../labs/lab-08.md) | Published |
 | 09 | Disk and Storage Management | Lab 09 | 2026-11-11 22:00 IST |
 | 10 | Software and Package Management | Lab 10 | 2026-11-11 22:00 IST |
 

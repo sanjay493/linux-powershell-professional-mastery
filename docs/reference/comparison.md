@@ -138,3 +138,55 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | List group members | `getent group GROUP` | `Get-LocalGroupMember -Group GROUP` | |
 | Admin group | `sudo` (Ubuntu) · `wheel` (RHEL family) | `Administrators` | |
 | Extra UID 0 accounts | `awk -F: '$3 == 0' /etc/passwd` | <code>Get-LocalUser &#124; Where-Object SID -like '&#42;-500'</code> (built-in Administrator) | |
+
+## Permissions
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Show permissions | `ls -l FILE` · `stat -c '%a %U:%G %n' FILE` | `Get-Acl FILE` · `icacls FILE` | `Get-Acl` is Windows-only |
+| Full access list | `getfacl FILE` | `(Get-Acl FILE).Access` · `(Get-Acl FILE).AccessToString` | |
+| Text baseline | `getfacl -R DIR` | `(Get-Acl DIR).Sddl` | |
+| Permissions along a path | `namei -l /path/file` | `icacls` on each folder | |
+| Set exact rights | `chmod 640 FILE` | `icacls FILE /inheritance:r /grant:r "User:(M)" "Group:(R)"` | |
+| Targeted change | `chmod u+x,o= FILE` | `icacls FILE /grant "NAME:(RX)"` · `/remove:g NAME` | |
+| Safe recursive change | `chmod -R u=rwX,go=rX DIR` | `icacls DIR /grant "Group:(OI)(CI)RX" /t` | |
+| Extra user or group | `setfacl -m u:NAME:rX FILE` | `icacls FILE /grant "NAME:(RX)"` · `AddAccessRule()` + `Set-Acl` | |
+| Remove one principal | `setfacl -x u:NAME FILE` | `icacls FILE /remove NAME` · `RemoveAccessRuleAll()` | |
+| Change owner | `sudo chown USER FILE` | `icacls FILE /setowner USER` · `takeown /f FILE` | |
+| Change group | `chgrp GROUP FILE` | — | NTFS primary group is rarely used |
+| Defaults for new files | `umask 027` · `setfacl -d -m g:team:rwX DIR` | Inheritable ACEs `(OI)(CI)` on the parent | |
+| Team folder | `chgrp team DIR && chmod 2770 DIR` | `icacls DIR /grant "Team:(OI)(CI)M"` | |
+| Shared drop folder | `chmod 1777 DIR` | CREATOR OWNER inheritable ACE | No sticky bit on Windows |
+| Disable inheritance | — | `icacls DIR /inheritance:d` (copy) or `:r` (remove) · `SetAccessRuleProtection()` | |
+| Reset to inherited defaults | — | `icacls DIR\* /reset /t /c` | |
+| Back up permissions | `getfacl -R DIR > perms.acl` | `icacls DIR /save perms.txt /t /c` | Always before a change |
+| Restore permissions | `setfacl --restore=perms.acl` | `icacls PARENT /restore perms.txt` | Same working dir / parent folder |
+| Simulate | `setfacl --test -m ...` | `Set-Acl ... -WhatIf` | `icacls` has no dry run |
+| Setuid/setgid audit | `sudo find / -xdev -type f -perm /6000` | — | No setuid on Windows |
+| World-writable audit | `sudo find / -xdev -type f -perm -o+w` | `Get-Acl` filter for `Everyone`/`Users` with Write/Modify/FullControl | |
+| Immutable file | `sudo chattr +i FILE` | — (closest: Deny Delete ACE) | |
+
+## Processes & services
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| List processes | `ps -ef` · `ps aux` | `Get-Process` · `tasklist` | |
+| Custom columns, sorted | `ps -eo pid,ppid,user,%cpu,%mem,cmd --sort=-%cpu` | <code>Get-Process &#124; Sort-Object CPU -Descending &#124; Select-Object Name, Id, CPU, WS</code> | `CPU` = seconds, `%cpu` = lifetime average |
+| Current CPU | `top -b -n 2 -d 1` · `process-monitor.sh` | two `Get-Process` samples · `Process-Monitor.ps1` | |
+| Find by name / command line | `pgrep -af PATTERN` | `Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%x%'"` | |
+| Parent process | `ps -o ppid= -p PID` · `pstree -p` | `Win32_Process.ParentProcessId` · `(Get-Process -Id n).Parent` (7.x) | |
+| Owner | `ps -o user= -p PID` | `Get-Process -IncludeUserName` (elevated) · `GetOwner()` | |
+| Graceful stop | `kill PID` | `taskkill /PID n` · `.CloseMainWindow()` | No signals on Windows |
+| Force stop | `kill -KILL PID` | `Stop-Process -Id n` · `taskkill /F /PID n` | |
+| Preview | `pgrep -a PATTERN` | `Stop-Process -Id n -WhatIf` | |
+| Priority | `nice -n 19 cmd` · `renice -n 19 -p PID` | `(Get-Process -Id n).PriorityClass = 'Idle'` | |
+| Background job | `cmd &` · `jobs` · `fg` · `bg` | `Start-Job` · `Get-Job` · `Receive-Job` | |
+| Time limit | `timeout 30 cmd` | `Wait-Process -Id n -Timeout 30` | |
+| Service status | `systemctl status NAME` | `Get-Service NAME` · `sc.exe query NAME` | |
+| Start / stop / restart | <code>sudo systemctl start&#124;stop&#124;restart NAME</code> | `Start-Service` · `Stop-Service` · `Restart-Service` (elevated) | |
+| Start at boot | `sudo systemctl enable --now NAME` | `Set-Service NAME -StartupType Automatic` | |
+| Disable | `sudo systemctl disable --now NAME` · `mask` | `Set-Service NAME -StartupType Disabled` | |
+| Failed services | `systemctl --failed` | <code>Get-Service &#124; Where-Object { $_.StartType -eq 'Automatic' -and $_.Status -ne 'Running' }</code> | Not identical concepts |
+| Service config | `systemctl cat NAME` · `systemctl show NAME` | `sc.exe qc NAME` · `Get-CimInstance Win32_Service -Filter "Name='NAME'"` | |
+| Service logs | `journalctl -u NAME -n 50` | `Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'}` | |
+| Dependencies | `systemctl list-dependencies [--reverse] NAME` | `Get-Service NAME -RequiredServices` / `-DependentServices` | |

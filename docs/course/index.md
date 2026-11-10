@@ -24,8 +24,8 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 | Day | Lesson | Key commands |
 |---|---|---|
 | 06 | [Users and Groups](module-2/day-06.md) | `useradd` `usermod` `passwd` `id` `groups` · `Get-LocalUser` `New-LocalUser` `Add-LocalGroupMember` |
-| 07 | File Permissions and Access Control | `chmod` `chown` `umask` · `Get-Acl` `Set-Acl` `icacls` |
-| 08 | Processes and Services | `ps` `top` `htop` `kill` `systemctl` · `Get-Process` `Stop-Process` `Get-Service` |
+| 07 | [File Permissions and Access Control](module-2/day-07.md) | `chmod` `chown` `umask` · `Get-Acl` `Set-Acl` `icacls` |
+| 08 | [Processes and Services](module-2/day-08.md) | `ps` `top` `htop` `kill` `systemctl` · `Get-Process` `Stop-Process` `Get-Service` |
 | 09 | Disk and Storage Management | `df` `du` `lsblk` `mount` `findmnt` · `Get-Disk` `Get-Volume` `Get-PSDrive` |
 | 10 | Software and Package Management | `apt` `dpkg` `dnf` · `winget` · PowerShellGet / PSResourceGet |
 

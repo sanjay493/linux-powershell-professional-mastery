@@ -644,3 +644,217 @@ Platform: **Ubuntu 24.04 LTS**, Bash 5.2, GNU coreutils 9.4. Commands marked *GN
 | **Common errors** | `groupdel: cannot remove the primary group of user 'x'` · `group 'x' already exists` |
 | **Use case** | Role-based access: grant a team group instead of individual users. |
 | **Docs** | <https://man7.org/linux/man-pages/man8/groupadd.8.html> · <https://man7.org/linux/man-pages/man1/gpasswd.1.html> |
+
+## Permissions
+
+### chmod
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (coreutils). Owner of the file or root |
+| **Description** | Changes mode bits: read/write/execute for user, group and others, plus setuid, setgid and sticky. Numeric modes set every bit; symbolic modes change only the bits named. |
+| **Syntax** | `chmod [-R] [-v] [-c] MODE[,MODE]... FILE...` · `chmod --reference=RFILE FILE...` |
+| **Parameters** | Numeric `640`, `2770` · symbolic `[ugoa][+-=][rwxXst]` · `-R` recursive · `-c` report changes · `-v` verbose · `--preserve-root` · `X` = execute for directories (and already-executable files) only |
+| **Example** | `chmod -R u=rwX,go=rX /srv/site` · `chmod 600 ~/.ssh/id_ed25519` |
+| **Expected output** | No output; with `-c`: `mode of 'backup.sh' changed from 0700 (rwx------) to 0740 (rwxr-----)` |
+| **Equivalent** | `icacls FILE /grant` · `Set-Acl` (NTFS ACEs; no execute bit model) |
+| **Common errors** | `chmod -R 644 dir` removes `x` from directories · `chmod 770` does **not** clear setgid on a directory (use `g-s` or `00770`) · `Operation not permitted` when you are not the owner |
+| **Use case** | Making a script executable; locking down a secrets file. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/chmod.1.html> |
+
+### chown / chgrp
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (coreutils). Changing the owner needs root; `chgrp` to one of your own groups is allowed for the owner |
+| **Description** | Change the owning user and/or group of files and directories. |
+| **Syntax** | `chown [-R] [-h] [-v] [OWNER][:[GROUP]] FILE...` · `chgrp [-R] [-h] [-v] GROUP FILE...` |
+| **Parameters** | `user:group` · `:group` (group only) · `-R` recursive · `-h` change a symlink itself · `--reference=RFILE` · `-c`/`-v` |
+| **Example** | `sudo chown -R www-data:www-data /var/www/site/uploads` |
+| **Expected output** | No output; with `-v`: `changed ownership of 'app.conf' from student:root to :lab-devs` |
+| **Equivalent** | `icacls FILE /setowner USER` · `takeown /f FILE` |
+| **Common errors** | `chown: changing ownership of 'f': Operation not permitted` (not root) · `invalid user` / `invalid group` (typo or account missing) |
+| **Use case** | Giving a service account ownership of only its writable data directory. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/chown.1.html> · <https://man7.org/linux/man-pages/man1/chgrp.1.html> |
+
+### umask
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (shell built-in). Ubuntu 24.04: `UMASK 022` in `/etc/login.defs`; `pam_umask` with `USERGROUPS_ENAB yes` gives `0002` to non-root users whose user name equals their primary group |
+| **Description** | Shows or sets the mask of permission bits removed from newly created files (from `666`) and directories (from `777`) in the current shell and its children. |
+| **Syntax** | `umask [-S] [MODE]` |
+| **Parameters** | `-S` symbolic output (allowed bits) · `MODE` octal (`027`) or symbolic (`u=rwx,g=rx,o=`) |
+| **Example** | `umask 027; touch f; mkdir d; ls -ld f d` |
+| **Expected output** | `0002` · `u=rwx,g=rwx,o=rx` (with `-S`) · new file `640`, new directory `750` after `umask 027` |
+| **Equivalent** | Windows has no umask; new items inherit `(OI)(CI)` ACEs from the parent folder |
+| **Common errors** | Setting it in an interactive shell and expecting it to persist · default ACLs override the umask |
+| **Use case** | `umask 077` at the top of a script that writes credentials. |
+| **Docs** | <https://man7.org/linux/man-pages/man2/umask.2.html> · <https://man7.org/linux/man-pages/man8/pam_umask.8.html> |
+
+### Special bits (setuid / setgid / sticky) and find -perm
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux. Setting them needs ownership; auditing system paths needs root |
+| **Description** | setuid (`4000`, `s` in user x) runs a program as its owner; setgid (`2000`) runs as its group or, on a directory, makes new entries inherit the group; sticky (`1000`, `t`) restricts deletion in shared directories. `find -perm` audits them. |
+| **Syntax** | `chmod u+s / g+s / +t FILE` · `chmod 4755 / 2770 / 1777 FILE` · `find PATH -xdev -perm -4000` · `-perm /6000` · `-perm -o+w` |
+| **Parameters** | `-perm MODE` exact · `-perm -MODE` all bits set · `-perm /MODE` any bit set · `-xdev` one filesystem · `-type f/d` |
+| **Example** | <code>sudo find / -xdev -type f -perm /6000 2&gt;/dev/null &#124; sort</code> · <code>sudo chgrp devs /srv/team &amp;&amp; sudo chmod 2770 /srv/team</code> |
+| **Expected output** | `/usr/bin/passwd`, `/usr/bin/sudo`, `/usr/bin/su`, `/usr/bin/chage`… (example list) · `drwxrws--- 2 root devs 4096 … /srv/team` |
+| **Equivalent** | No setuid on Windows (services and UAC instead) · team folder = inheritable group ACE `(OI)(CI)M` |
+| **Common errors** | Capital `S`/`T` (special bit without `x`) · setuid on shell scripts is ignored by Linux · numeric `chmod` keeps setgid on directories |
+| **Use case** | Building a team directory; SUID baseline during hardening and incident response. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/chmod.1.html> · <https://man7.org/linux/man-pages/man1/find.1.html> · <https://man7.org/linux/man-pages/man7/inode.7.html> |
+
+### getfacl / setfacl
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux with the `acl` package (installed on standard Ubuntu; `sudo apt install acl` on minimal images) and an ACL-capable filesystem (ext4, XFS, Btrfs) |
+| **Description** | POSIX ACLs add named users and groups to a file's permissions, plus default ACLs that new files in a directory inherit. `getfacl -R` / `setfacl --restore` back up and restore owner, group, mode and ACLs. |
+| **Syntax** | `getfacl [-R] [-p] [--omit-header] FILE...` · `setfacl [-R] [-d] -m ENTRIES FILE...` · `setfacl -x ENTRIES FILE` · `setfacl -b FILE` · `setfacl --restore=FILE` |
+| **Parameters** | Entries `u:NAME:rwx`, `g:NAME:r-x`, `m::rw-`, `o::---`, `d:` prefix = default · `-m` modify · `-x` remove · `-b` remove all · `-k` remove default · `-d` default · `-R` recursive · `--test` dry run |
+| **Example** | `sudo setfacl -R -m u:lab-audit:rX /srv/reports` · `getfacl -R project > perms.acl` |
+| **Expected output** | `user::rw-` / `user:lab-audit:r--` / `group::r--` / `mask::r--` / `other::---` (example) |
+| **Equivalent** | `icacls FILE /grant "USER:(R)"` · `Get-Acl` / `Set-Acl` · `icacls /save` and `/restore` |
+| **Common errors** | `chmod g=` lowers the **mask** and silently reduces named entries (`#effective:`) · restoring from a different working directory · `Operation not supported` on filesystems without ACLs |
+| **Use case** | Read-only access for an auditor without adding them to the team group. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/getfacl.1.html> · <https://man7.org/linux/man-pages/man1/setfacl.1.html> · <https://man7.org/linux/man-pages/man5/acl.5.html> |
+
+### stat / namei / lsattr / chattr
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (`stat`: coreutils; `namei`: util-linux; `lsattr`/`chattr`: e2fsprogs, ext4-specific attributes) |
+| **Description** | `stat` prints the exact octal mode and owner; `namei -l` shows permissions of every directory on a path; `lsattr`/`chattr` show and set attributes such as immutable (`i`) and append-only (`a`). |
+| **Syntax** | `stat [-c FORMAT] FILE` · `namei -l PATH` · `lsattr FILE` · `chattr [+-=]ATTRS FILE` |
+| **Parameters** | `stat -c '%a %A %U:%G %n'` · `chattr +i` immutable (root) · `chattr +a` append-only |
+| **Example** | `stat -c '%a %U:%G %n' /etc/shadow` |
+| **Expected output** | `640 root:shadow /etc/shadow` · `----i---------e------- locked.conf` (lsattr) |
+| **Equivalent** | `Get-Acl` · <code>Get-Item FILE &#124; Select-Object Attributes</code> (read-only/hidden attributes) |
+| **Common errors** | `rm: cannot remove 'f': Operation not permitted` as root (immutable flag set) |
+| **Use case** | Finding the one directory on a path that lacks `x`; spotting attacker-set immutable files. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/stat.1.html> · <https://man7.org/linux/man-pages/man1/namei.1.html> · <https://man7.org/linux/man-pages/man1/chattr.1.html> |
+
+## Processes & Services
+
+### ps
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (procps-ng). Accepts BSD (`aux`), POSIX (`-ef`) and GNU (`--sort`) option styles |
+| **Description** | Prints a one-time snapshot of processes read from `/proc`. `%CPU` is the average since the process started, not current usage. |
+| **Syntax** | <code>ps [aux &#124; -ef] [-o FORMAT] [--sort=[-]KEY] [-p PID] [-u USER] [-C NAME] [--ppid PID]</code> |
+| **Parameters** | `-e` every process · `-f` full format (PPID) · `-o pid,ppid,user,%cpu,%mem,stat,etime,cmd` custom columns · `--sort=-%cpu` sort descending · `-p` PIDs · `-u` user · `-C` command name · `--ppid` children |
+| **Example** | <code>ps -eo pid,ppid,user,%cpu,%mem,stat,etime,cmd --sort=-%cpu &#124; head -5</code> |
+| **Expected output** | `PID PPID USER %CPU %MEM STAT ELAPSED CMD` / `3322 3317 student 98.0 0.0 R 00:02 lab-cpu-hog …` (example) |
+| **Equivalent** | `Get-Process` · `Get-CimInstance Win32_Process` · `tasklist` |
+| **Common errors** | Reading `%CPU` as current usage · mixing styles (`ps -aux` warns or behaves differently) · `grep` matching itself (use `pgrep` or `grep [p]attern`) |
+| **Use case** | Recording owner, parent and command line of a suspicious process in an incident ticket. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ps.1.html> |
+
+### top / htop
+
+| Field | Detail |
+|---|---|
+| **OS** | `top`: all Linux (procps-ng). `htop`: separate package (in Ubuntu Server's `ubuntu-server` metapackage; otherwise `sudo apt install htop`) |
+| **Description** | Live, sorted process view with load average, CPU and memory summary. `%CPU` is per core (Irix mode): 200% = two cores. |
+| **Syntax** | `top [-b] [-n N] [-d SECONDS] [-p PID] [-u USER] [-o FIELD]` · `htop` |
+| **Parameters** | `-b` batch (plain text) · `-n` iterations · `-d` delay · `-o %MEM` sort field · keys: `P` CPU, `M` memory, `1` per-CPU, `c` command line, `k` kill, `r` renice, `q` quit |
+| **Example** | <code>top -b -n 1 -o %MEM &#124; head -15</code> |
+| **Expected output** | Header (`top - 16:55:02 up 7:52, load average: 1.02, 0.61, 0.33`, Tasks, %Cpu(s), MiB Mem) then the process table (example) |
+| **Equivalent** | Task Manager · Resource Monitor · two samples of `Get-Process` CPU |
+| **Common errors** | First batch iteration shows averages; use `-n 2 -d 1` and read the second frame for current values |
+| **Use case** | Confirming which process causes a high-load alert. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/top.1.html> · <https://htop.dev/> |
+
+### pgrep / pkill
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (procps-ng) |
+| **Description** | `pgrep` lists PIDs of processes matching a pattern; `pkill` sends them a signal (default `SIGTERM`). Patterns are extended regular expressions. Exit status 0 = match, 1 = none. |
+| **Syntax** | <code>pgrep [-l &#124; -a] [-f] [-x] [-u USER] [-n &#124; -o] [-c] PATTERN</code> · `pkill [-SIGNAL] [-e] [-f] [-x] [-u USER] PATTERN` |
+| **Parameters** | `-a` full command line · `-l` name · `-f` match full command line · `-x` exact name · `-u` effective user · `-n`/`-o` newest/oldest · `-c` count · `-e` (pkill) echo what was signalled |
+| **Example** | `pgrep -af lab08-report.sh` then `pkill -f lab08-report.sh` |
+| **Expected output** | `3561 bash /home/student/lab08/lab08-report.sh` (captured, user renamed) |
+| **Equivalent** | `Get-Process -Name` · <code>Get-CimInstance Win32_Process &#124; Where-Object CommandLine -like '&#42;x&#42;'</code> · `Stop-Process` |
+| **Common errors** | Broad `-f` patterns matching other users' or unrelated processes; always preview with `pgrep -a` |
+| **Use case** | Stopping one runaway job by script name without touching others. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/pgrep.1.html> |
+
+### kill / killall and signals
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux. `kill` is a Bash built-in (also `/usr/bin/kill`, procps); `killall` is in psmisc |
+| **Description** | Sends a signal to processes or jobs. `SIGTERM` (15, default) asks for a clean exit; `SIGKILL` (9) cannot be caught; `SIGHUP` (1) often means "reload"; `SIGSTOP`/`SIGCONT` freeze/resume. Killed processes exit with 128 + signal (143, 137). |
+| **Syntax** | <code>kill [-s SIGNAL &#124; -SIGNAL] PID&#124;%JOB...</code> · `kill -l [N]` · `kill -0 PID` · `killall [-i] [-SIGNAL] NAME` |
+| **Parameters** | `-TERM` `-HUP` `-KILL` `-STOP` `-CONT` `-USR1` · `-l` list/translate signals · `-0` existence and permission test · `killall -i` confirm |
+| **Example** | `kill -TERM 3561; sleep 5; kill -0 3561 && kill -KILL 3561` |
+| **Expected output** | No output on success; `kill: (3561) - No such process` if already gone |
+| **Equivalent** | `Stop-Process -Id` (always forced) · `taskkill /PID n [/F] [/T]` |
+| **Common errors** | `Operation not permitted` (another user's process) · `kill -9` first, losing clean-up · trying to kill a zombie (`Z`) or `D`-state process |
+| **Use case** | Graceful-then-forced termination of a hung worker. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/kill.1.html> · <https://man7.org/linux/man-pages/man7/signal.7.html> · <https://man7.org/linux/man-pages/man1/killall.1.html> |
+
+### jobs / bg / fg / nohup / timeout
+
+| Field | Detail |
+|---|---|
+| **OS** | `jobs`, `bg`, `fg`, `disown`: Bash built-ins (interactive job control). `nohup`, `timeout`: coreutils |
+| **Description** | `&` starts a background job; ++ctrl+z++ stops the foreground job; `bg`/`fg` resume it; `nohup`/`disown` keep jobs alive after logout; `timeout` limits run time. |
+| **Syntax** | `cmd &` · `jobs [-l]` · `fg [%N]` · `bg [%N]` · `disown [%N]` · `nohup cmd > log 2>&1 &` · `timeout [-k D] DURATION cmd` |
+| **Parameters** | `%N` job number · `%+`/`%-` current/previous job · `$!` last background PID · `timeout -k 5` add `SIGKILL` after 5 s; exit 124 = timed out |
+| **Example** | `sleep 600 & jobs -l` |
+| **Expected output** | `[1] 1230` / `[1]+  1230 Running                 sleep 600 &` (captured) |
+| **Equivalent** | `Start-Job` · `Get-Job` · `Receive-Job` · `Stop-Job` · `cmd &` (PowerShell 7) |
+| **Common errors** | Job lost when the SSH session closes (use `nohup`, `tmux` or a systemd unit) · `nohup.out` filling the disk |
+| **Use case** | Running a long copy or capture over SSH safely. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/bash.html#Job-Control> · <https://man7.org/linux/man-pages/man1/nohup.1.html> · <https://man7.org/linux/man-pages/man1/timeout.1.html> |
+
+### nice / renice
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux. `nice`: coreutils; `renice`: util-linux (bsdutils on Ubuntu) |
+| **Description** | Start a command with, or change, a nice value from −20 (highest priority) to 19 (lowest). Normal users can only increase the value of their own processes. |
+| **Syntax** | `nice [-n N] cmd` · <code>renice [-n] N [-p PID... &#124; -u USER... &#124; -g PGRP...]</code> |
+| **Parameters** | `-n` value/adjustment · `-p` process · `-u` all processes of a user · `-g` process group |
+| **Example** | `renice -n 19 -p 3561` |
+| **Expected output** | `3561 (process ID) old priority 0, new priority 19` (captured) |
+| **Equivalent** | `(Get-Process -Id n).PriorityClass = 'BelowNormal'` |
+| **Common errors** | `renice: failed to set priority for N (process ID): Permission denied` when lowering the value as a normal user |
+| **Use case** | Keeping backups and report jobs from slowing interactive users. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/nice.1.html> · <https://man7.org/linux/man-pages/man1/renice.1.html> |
+
+### systemctl
+
+| Field | Detail |
+|---|---|
+| **OS** | systemd-based distributions (Ubuntu 15.04+, RHEL 7+). Needs systemd as PID 1 (not most containers; WSL2 only with `systemd=true`). Changes need root |
+| **Description** | Inspects and controls systemd units: current state (active/inactive/failed) and boot-time enablement (enabled/disabled/static/masked). |
+| **Syntax** | <code>systemctl [--now] {status&#124;start&#124;stop&#124;restart&#124;reload&#124;enable&#124;disable&#124;is-active&#124;is-enabled&#124;mask&#124;unmask&#124;cat&#124;show} UNIT</code> · `systemctl list-units --type=service [--state=failed]` · `systemctl --failed` · `systemctl daemon-reload` |
+| **Parameters** | `--now` start/stop together with enable/disable · `--no-pager` · `-l`/`--full` full lines · `-p PROP` with `show` · `--type`, `--state` filters |
+| **Example** | `systemctl status cron --no-pager` |
+| **Expected output** | `● cron.service - Regular background program processing daemon` / `Loaded: loaded (…; enabled; preset: enabled)` / `Active: active (running) since …` (example) |
+| **Equivalent** | `Get-Service` · `Start-/Stop-/Restart-Service` · `Set-Service -StartupType` · `sc.exe` |
+| **Common errors** | `Unit X.service not found` (Ubuntu uses `ssh`, not `sshd`) · forgetting `daemon-reload` after editing · `disable` without `--now` · forgotten `mask` · `System has not been booted with systemd as init system` |
+| **Use case** | Diagnosing and restarting a failed web service after a configuration change. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/systemctl.1.html> · <https://man7.org/linux/man-pages/man5/systemd.service.5.html> |
+
+### journalctl -u
+
+| Field | Detail |
+|---|---|
+| **OS** | systemd-based distributions. Full system journal needs `adm`/`systemd-journal` membership or root |
+| **Description** | Reads the systemd journal; `-u` filters one service's messages, including systemd's own start/stop/failure lines. |
+| **Syntax** | `journalctl [-u UNIT] [-n N] [-f] [-b [-1]] [--since T] [--until T] [-p PRIO] [-x] [-o FORMAT] [--no-pager]` |
+| **Parameters** | `-u` unit · `-n` last N lines · `-f` follow · `-e` end of pager · `-b` this boot (`-b -1` previous) · `--since "1 hour ago"` · `-p err` priority and above · `-x` explanations · `-o short-iso`/`json` |
+| **Example** | `journalctl -u lab08-web -n 20 --no-pager` |
+| **Expected output** | `… lab08-web.service: Failed to locate executable /usr/bin/pyhton3: No such file or directory` / `… Main process exited, code=exited, status=203/EXEC` (example) |
+| **Equivalent** | `Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'}` |
+| **Common errors** | `No journal files were found` / partial output without group membership · forgetting `--no-pager` in scripts |
+| **Use case** | Finding why a service failed to start. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/journalctl.1.html> |

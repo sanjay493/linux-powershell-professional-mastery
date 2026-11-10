@@ -621,3 +621,206 @@ All `*-Local*` cmdlets are in the **`Microsoft.PowerShell.LocalAccounts`** modul
 | **Common errors** | Passwords typed as `net user NAME P@ss /add` end up in history (use `*` to be prompted) |
 | **Use case** | Quick checks on systems without the LocalAccounts module, and checking whether a session is elevated. |
 | **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/whoami> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/net-user> |
+
+## Permissions
+
+`Get-Acl` and `Set-Acl` are in **Microsoft.PowerShell.Security** and are **Windows only** in PowerShell 7 (the documentation states "This cmdlet is only available on the Windows platform"). `icacls.exe` and `takeown.exe` are native Windows tools and behave the same from 5.1 and 7. Back up ACLs with `icacls /save` before every change.
+
+### Get-Acl
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. FileSystem and Registry providers. No elevation needed except for `-Audit` |
+| **Description** | Returns the security descriptor of a file, folder or registry key: `Owner`, `Group`, `Access` (DACL as `FileSystemAccessRule` objects), `AccessToString`, `Sddl`, `AreAccessRulesProtected`, and `Audit` (SACL) with `-Audit`. |
+| **Syntax** | `Get-Acl [[-Path] <String[]>] [-Audit] [-Filter <String>] [-Include <String[]>] [-Exclude <String[]>]` · `Get-Acl -LiteralPath <String[]>` · `Get-Acl -InputObject <PSObject>` |
+| **Parameters** | `-Path` / `-LiteralPath` · `-Audit` (SACL) · `-Filter` / `-Include` / `-Exclude` · 5.1 only: `-AllCentralAccessPolicies`, `-UseTransaction` |
+| **Example** | <code>(Get-Acl C:\Data).Access &#124; Format-Table IdentityReference, FileSystemRights, AccessControlType, IsInherited</code> |
+| **Expected output** | `BUILTIN\Administrators Allow FullControl True` · `WIN11-LAB\Team Allow Modify, Synchronize False` (example) |
+| **Equivalent** | `ls -l` · `stat` · `getfacl` |
+| **Common errors** | `The term 'Get-Acl' is not recognized` (PowerShell on Linux/macOS) · `Attempted to perform an unauthorized operation` with `-Audit` when not elevated |
+| **Use case** | Auditing who can write to a share or a service binary; saving `.Sddl` baselines. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/get-acl> |
+
+### Set-Acl
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Rights to change the DACL (`WRITE_DAC`) required; owner/SACL changes need elevation |
+| **Description** | Applies a (modified) security descriptor to items. Pattern: `Get-Acl` → modify in memory → `Set-Acl`. Supports `-WhatIf`/`-Confirm`. |
+| **Syntax** | `Set-Acl [-Path] <String[]> [-AclObject] <Object> [-ClearCentralAccessPolicy] [-PassThru] [-Filter <String>] [-Include <String[]>] [-Exclude <String[]>] [-WhatIf] [-Confirm]` · `Set-Acl -LiteralPath ...` · `Set-Acl [-InputObject] <PSObject> ...` |
+| **Parameters** | `-AclObject` · `-PassThru` · `-WhatIf` · `-Confirm` · `-ClearCentralAccessPolicy` |
+| **Example** | <code>Get-Acl C:\Template &#124; Set-Acl -Path C:\Data</code> · `Set-Acl -Path C:\Data -AclObject $acl -WhatIf` |
+| **Expected output** | No output (or the descriptor with `-PassThru`); `What if: Performing the operation "Set-Acl" on target "C:\Data".` |
+| **Equivalent** | `chmod` · `setfacl -m` · `icacls /grant` |
+| **Common errors** | `The security identifier is not allowed to be the owner of this object` (5.1; use `icacls` or elevate) · `Attempted to perform an unauthorized operation` (not elevated / no WRITE_DAC) |
+| **Use case** | Scripted, reviewable ACL changes with `-WhatIf` first. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/set-acl> |
+
+### FileSystemAccessRule / SetAccessRuleProtection
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | .NET classes, usable from 5.1 and 7.x on **Windows** (`::new()` needs PowerShell 5.0+) |
+| **Description** | Build an ACE and edit the in-memory ACL before `Set-Acl`. Methods: `AddAccessRule` (merge), `SetAccessRule` (replace that identity's Allow rules), `RemoveAccessRule`, `RemoveAccessRuleAll`, `PurgeAccessRules`, `SetAccessRuleProtection(isProtected, preserveInheritance)` (disable inheritance, keep or drop inherited ACEs), `SetOwner`. |
+| **Syntax** | `[System.Security.AccessControl.FileSystemAccessRule]::new(identity, rights, inheritanceFlags, propagationFlags, 'Allow'/'Deny')` |
+| **Parameters** | Rights: `FullControl`, `Modify`, `ReadAndExecute`, `Read`, `Write`… · InheritanceFlags: `None`, `ContainerInherit`, `ObjectInherit` · PropagationFlags: `None`, `InheritOnly`, `NoPropagateInherit` |
+| **Example** | `$acl.AddAccessRule([System.Security.AccessControl.FileSystemAccessRule]::new('Team','Modify','ContainerInherit,ObjectInherit','None','Allow'))` · `$acl.SetAccessRuleProtection($true, $true)` |
+| **Expected output** | No output; changes appear after `Set-Acl` (`IsInherited False`, `AreAccessRulesProtected True`) |
+| **Equivalent** | `setfacl -m` / `setfacl -d -m` (default ACL) · `icacls /grant "Team:(OI)(CI)M"` · `icacls /inheritance:d` |
+| **Common errors** | `SetAccessRule` unexpectedly removing a user's other rights · forgetting `Set-Acl` (nothing changes on disk) · removing inherited ACEs before granting explicit access |
+| **Use case** | Granting a group inheritable Modify on a project folder. |
+| **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.filesystemaccessrule> · <https://learn.microsoft.com/en-us/dotnet/api/system.security.accesscontrol.objectsecurity.setaccessruleprotection> |
+
+### icacls
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (native `icacls.exe`), any PowerShell or cmd. Elevation depends on the object |
+| **Description** | Displays and modifies NTFS DACLs, changes inheritance and owner, and **saves/restores** DACLs for whole trees. `(I)` marks inherited ACEs. |
+| **Syntax** | <code>icacls name [/grant[:r] Sid:perm] [/deny Sid:perm] [/remove[:g&#124;:d] Sid] [/inheritance:e&#124;d&#124;r] [/setowner user] [/reset] [/t] [/c] [/q]</code> · `icacls name /save file /t /c` · `icacls directory /restore file` |
+| **Parameters** | Rights `F M RX R W D N` · inheritance `(OI)(CI)(IO)(NP)` · `/grant` add · `/grant:r` replace explicit · `/remove:g` grants · `/inheritance:d` copy · `:r` remove · `:e` enable · `/t` recurse · `/c` continue · `/findsid` |
+| **Example** | `icacls D:\Shares\HR /save C:\Backup\hr-acl.txt /t /c` · `icacls D:\Shares\HR /grant "HR-Staff:(OI)(CI)M"` |
+| **Expected output** | `D:\Shares\HR BUILTIN\Administrators:(OI)(CI)(F)` … `Successfully processed 1 files; Failed processing 0 files` (example) |
+| **Equivalent** | `chmod` · `setfacl` · `getfacl -R` / `setfacl --restore` |
+| **Common errors** | Unquoted `(OI)(CI)` in PowerShell (`The term 'OI' is not recognized`) · `/restore` run on the folder instead of its parent · `/inheritance:r` before granting explicit access (lock-out) |
+| **Use case** | Ticket-ready, reversible permission changes on file shares. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/icacls> |
+
+### takeown
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (native `takeown.exe`). Usually needs an elevated prompt |
+| **Description** | Makes the current user (or, with `/a`, the Administrators group) the owner of files or folders, so their DACL can be repaired. Ownership alone grants no file access. |
+| **Syntax** | <code>takeown [/s computer [/u user [/p [password]]]] /f filename [/a] [/r [/d {Y&#124;N}]]</code> |
+| **Parameters** | `/f` target (wildcard `*` allowed) · `/a` give to Administrators · `/r` recursive · `/d Y` answer the prompt for directories you cannot list |
+| **Example** | `takeown /f D:\Profiles\jdoe /a /r /d y` followed by `icacls D:\Profiles\jdoe /reset /t /c` |
+| **Expected output** | `SUCCESS: The file (or folder): "D:\Profiles\jdoe" now owned by the administrators group.` (example) |
+| **Equivalent** | `sudo chown -R root: DIR` |
+| **Common errors** | Expecting access immediately after `takeown` (grant it with `icacls`) · running non-elevated |
+| **Use case** | Recovering a folder whose DACL locks out administrators. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/takeown> |
+
+## Processes & Services
+
+`Get-Process`, `Stop-Process`, `Start-Process` and `Wait-Process` work in 5.1 and 7 on every OS. The **service** cmdlets, `Get-CimInstance`, `Get-WinEvent` and `Get-Counter` are **Windows only**. Changing services requires an elevated session.
+
+### Get-Process
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Aliases: `gps` (all), `ps` (Windows only) |
+| **Description** | Returns `System.Diagnostics.Process` objects. Default columns: `NPM(K)`, `PM(M)`, `WS(M)` (working set ≈ RSS), `CPU(s)` (**cumulative processor seconds**, not %), `Id`, `SI` (session). PowerShell 7.x adds `Parent` and `CommandLine` properties. |
+| **Syntax** | `Get-Process [[-Name] <String[]>] [-Module] [-FileVersionInfo]` · `Get-Process -Id <Int32[]> [-IncludeUserName]` |
+| **Parameters** | `-Name` (wildcards, no `.exe`) · `-Id` · `-IncludeUserName` (elevation required on Windows) · `-Module` · `-FileVersionInfo` (others' processes need elevation) |
+| **Example** | <code>Get-Process &#124; Sort-Object CPU -Descending &#124; Select-Object -First 5 Name, Id, CPU, WS</code> |
+| **Expected output** | `MsMpEng 3828 402.17 327…` (example) |
+| **Equivalent** | `ps -eo pid,user,%cpu,%mem,cmd` · `top -b -n 1` |
+| **Common errors** | `Cannot find a process with the name "x.exe"` (drop `.exe`) · `The 'IncludeUserName' parameter requires elevated user rights` · treating `CPU` as a percentage |
+| **Use case** | Finding the largest memory consumer on a terminal server. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-process> |
+
+### Stop-Process
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS. Aliases: `spps` (all), `kill` (Windows only) |
+| **Description** | Ends processes immediately (`Process.Kill` / TerminateProcess — no clean-up, like `SIGKILL`). Prompts before stopping a process you do not own unless `-Force`. Asynchronous: use `Wait-Process` to confirm. |
+| **Syntax** | `Stop-Process [-Id] <Int32[]> [-PassThru] [-Force] [-WhatIf] [-Confirm]` · `Stop-Process -Name <String[]> …` · `Stop-Process [-InputObject] <Process[]> …` |
+| **Parameters** | `-Id` · `-Name` · `-InputObject` (pipeline) · `-Force` · `-PassThru` · `-WhatIf` · `-Confirm` |
+| **Example** | `Stop-Process -Id 8744 -WhatIf` |
+| **Expected output** | `What if: Performing the operation "Stop-Process" on target "powershell (8744)".` |
+| **Equivalent** | `kill -KILL PID` · `pkill` · `taskkill /F /PID n` |
+| **Common errors** | `Access is denied` (not elevated / protected process) · `Stop-Process -Name svchost` stopping many services |
+| **Use case** | Ending one hung application instance after collecting its command line. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/stop-process> |
+
+### Start-Process / Wait-Process
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS (`-Verb`, `-WindowStyle`, `-Credential` with profile options are Windows-oriented). Aliases: `saps`, `start` (Windows only) |
+| **Description** | `Start-Process` starts a program, optionally elevated, hidden or waiting; `-PassThru` returns the process object. `Wait-Process` waits until processes exit. |
+| **Syntax** | `Start-Process [-FilePath] <String> [[-ArgumentList] <String[]>] [-WorkingDirectory <String>] [-PassThru] [-Wait] [-WindowStyle <ProcessWindowStyle>] [-NoNewWindow] [-Verb <String>]` · <code>Wait-Process [-Name] &lt;String[]&gt; &#124; -Id &lt;Int32[]&gt; [[-Timeout] &lt;Int32&gt;]</code> |
+| **Parameters** | `-ArgumentList` · `-PassThru` · `-Wait` · `-WindowStyle Hidden/Minimized` · `-NoNewWindow` · `-RedirectStandardOutput` · `-Verb RunAs` (UAC elevation) · `Wait-Process -Timeout` |
+| **Example** | `$p = Start-Process notepad.exe -PassThru; Wait-Process -Id $p.Id -Timeout 60` |
+| **Expected output** | No output; `Wait-Process` returns when Notepad closes or errors after 60 s |
+| **Equivalent** | `cmd &` · `nohup` · `wait PID` · `sudo` |
+| **Common errors** | Arguments with spaces not quoted inside `-ArgumentList` · `-Verb RunAs` with `-NoNewWindow` (not supported together) |
+| **Use case** | Launching an installer elevated and waiting for it to finish in a deployment script. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/wait-process> |
+
+### Get-CimInstance Win32_Process
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (CIM/WMI) |
+| **Description** | WMI view of processes with `ProcessId`, `ParentProcessId`, `CommandLine`, `ExecutablePath`, `CreationDate` and the `GetOwner()` method — the investigator's process list, and the way to get parent/command line in 5.1. |
+| **Syntax** | `Get-CimInstance -ClassName Win32_Process [-Filter <String>] [-Property <String[]>]` · <code>… &#124; Invoke-CimMethod -MethodName GetOwner</code> |
+| **Parameters** | `-Filter` (WQL: `"Name = 'powershell.exe'"`, `"CommandLine LIKE '%lab08%'"`) · `-Property` · `-ComputerName`/`-CimSession` for remote |
+| **Example** | <code>Get-CimInstance Win32_Process -Filter "ProcessId = $PID" &#124; Select-Object ProcessId, ParentProcessId, CommandLine</code> |
+| **Expected output** | `7760 9124 "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"` (example) |
+| **Equivalent** | `ps -o pid,ppid,user,cmd -p PID` · `/proc/PID/cmdline` |
+| **Common errors** | Empty `CommandLine` for other users' processes when not elevated · WQL uses `%` not `*` as wildcard |
+| **Use case** | Spotting `WINWORD.EXE` → `powershell.exe -enc` parent–child chains. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-process> |
+
+### Get-Service
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Alias: `gsv`. No elevation needed to read |
+| **Description** | Lists services as `ServiceController` objects: `Name`, `DisplayName`, `Status`, `StartType`, dependencies. PowerShell 7 (6.0+) adds `UserName`, `Description`, `BinaryPathName`, `StartupType`, `DelayedAutoStart` and removes `-ComputerName`. |
+| **Syntax** | `Get-Service [[-Name] <String[]>] [-DisplayName <String[]>] [-DependentServices] [-RequiredServices] [-Include/-Exclude <String[]>]` |
+| **Parameters** | `-Name` (wildcards) · `-DisplayName` · `-DependentServices` · `-RequiredServices` · `-ComputerName` (5.1 only) |
+| **Example** | <code>Get-Service &#124; Where-Object { $_.StartType -eq 'Automatic' -and $_.Status -ne 'Running' }</code> |
+| **Expected output** | `Name Status StartType` / `edgeupdate Stopped Automatic` (example) |
+| **Equivalent** | `systemctl status` · `systemctl list-units --type=service` · `sc.exe query` |
+| **Common errors** | Using the display name with `-Name` · `Get-Service` not found in PowerShell on Linux |
+| **Use case** | Morning check for automatic services that are not running. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-service> |
+
+### Start-Service / Stop-Service / Restart-Service
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. Aliases: `sasv`, `spsv`. **Elevation required** |
+| **Description** | Control services through the Service Control Manager. `Stop-Service`/`Restart-Service` refuse when dependent services are running unless `-Force` (which stops the dependants too). |
+| **Syntax** | `Start-Service [-Name] <String[]> [-PassThru] [-WhatIf] [-Confirm]` · `Stop-Service [-Name] <String[]> [-Force] [-NoWait] [-PassThru] [-WhatIf]` · `Restart-Service [-Name] <String[]> [-Force] [-PassThru] [-WhatIf]` |
+| **Parameters** | `-Name` / `-DisplayName` / `-InputObject` · `-Force` · `-NoWait` (Stop-Service) · `-PassThru` · `-WhatIf` · `-Confirm` |
+| **Example** | `Restart-Service -Name Spooler -WhatIf` |
+| **Expected output** | `What if: Performing the operation "Restart-Service" on target "Print Spooler (Spooler)".` |
+| **Equivalent** | `sudo systemctl start/stop/restart NAME` |
+| **Common errors** | `Cannot open Spooler service on computer '.'` (not elevated) · `Cannot stop service … because it has dependent services` · service disabled |
+| **Use case** | Clearing a hung print queue after confirming with users. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/restart-service> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/stop-service> |
+
+### Set-Service
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**. **Elevation required** |
+| **Description** | Changes start type, display name, description or status of a service. PowerShell 7 adds `AutomaticDelayedStart`, `-Credential`, `-SecurityDescriptorSddl` and `-Force`. |
+| **Syntax** | <code>Set-Service [-Name] &lt;String&gt; [-StartupType &lt;Automatic&#124;Manual&#124;Disabled&#124;AutomaticDelayedStart&gt;] [-Status &lt;Running&#124;Stopped&#124;Paused&gt;] [-Description &lt;String&gt;] [-PassThru] [-WhatIf]</code> |
+| **Parameters** | `-StartupType` (aliases `StartMode`, `SM`, `ST`) · `-Status` · `-DisplayName` · `-Description` · `-Credential` (7.x) · `-PassThru` · `-WhatIf` |
+| **Example** | `Set-Service -Name BITS -StartupType Manual -WhatIf` |
+| **Expected output** | `What if: Performing the operation "Set-Service" on target "Background Intelligent Transfer Service (BITS)".` |
+| **Equivalent** | `sudo systemctl enable/disable NAME` · `sc.exe config NAME start= demand` |
+| **Common errors** | `AutomaticDelayedStart` in 5.1 (not a valid value; use `sc.exe config NAME start= delayed-auto`) · disabling a service other services need |
+| **Use case** | Setting an unused service to Manual as part of hardening, with a change record. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/set-service> |
+
+### sc.exe · tasklist · taskkill
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Native Windows tools, usable from cmd, 5.1 and 7. In 5.1 always type **`sc.exe`** (`sc` = `Set-Content`) |
+| **Description** | `sc.exe` queries and configures the SCM (config, failure actions, security descriptors); `tasklist` lists processes (`/V` verbose, `/SVC` hosted services); `taskkill` ends processes (`/F` force, `/T` tree). |
+| **Syntax** | <code>sc.exe query&#124;qc&#124;qfailure&#124;sdshow NAME</code> · <code>sc.exe config NAME start= auto&#124;demand&#124;disabled&#124;delayed-auto</code> · `tasklist [/V] [/SVC] [/FI "filter"]` · <code>taskkill /PID n &#124; /IM name [/F] [/T]</code> |
+| **Parameters** | `start=` (space after `=` is required) · `failure NAME reset= SEC actions= restart/MS` · `/FI "IMAGENAME eq x.exe"` · `/F` · `/T` |
+| **Example** | `tasklist /SVC /FI "IMAGENAME eq svchost.exe"` |
+| **Expected output** | `svchost.exe 1208 RpcEptMapper, RpcSs` (example) |
+| **Equivalent** | `systemctl cat/show` · `ps` · `kill` |
+| **Common errors** | `sc query x` in 5.1 creating a file named `query` · `start=demand` without the space |
+| **Use case** | Finding which `svchost.exe` hosts a misbehaving service before restarting only that service. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/sc-query> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tasklist> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill> |

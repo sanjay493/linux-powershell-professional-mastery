@@ -138,6 +138,8 @@ nav:
           - course/module-2/index.md
           # >>> DAYS module-2
           - "Day 06: Users & Groups": course/module-2/day-06.md
+          - "Day 07: File Permissions & Access Control": course/module-2/day-07.md
+          - "Day 08: Processes & Services": course/module-2/day-08.md
           # <<< DAYS module-2
       - "Module 3: Networking & Troubleshooting":
           - course/module-3/index.md
@@ -169,6 +171,8 @@ nav:
       - "Lab 04: Needle in the Haystack": labs/lab-04.md
       - "Lab 05: Pipeline Builder": labs/lab-05.md
       - "Lab 06: Onboard & Offboard": labs/lab-06.md
+      - "Lab 07: Lock It Down": labs/lab-07.md
+      - "Lab 08: Runaway Process": labs/lab-08.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md
