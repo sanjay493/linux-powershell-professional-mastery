@@ -22,7 +22,7 @@ You will manage accounts, control access with Linux permissions and Windows NTFS
 | 06 | [Users and Groups](day-06.md) | [Lab 06](../../labs/lab-06.md) | Published |
 | 07 | [File Permissions and Access Control](day-07.md) | [Lab 07](../../labs/lab-07.md) | Published |
 | 08 | [Processes and Services](day-08.md) | [Lab 08](../../labs/lab-08.md) | Published |
-| 09 | Disk and Storage Management | Lab 09 | 2026-11-11 22:00 IST |
-| 10 | Software and Package Management | Lab 10 | 2026-11-11 22:00 IST |
+| 09 | [Disk and Storage Management](day-09.md) | [Lab 09](../../labs/lab-09.md) | Published |
+| 10 | [Software and Package Management](day-10.md) | [Lab 10](../../labs/lab-10.md) | Published |
 
-**Module test:** released with Day 10 in [Assessments](../../assessments/index.md).
+**Module test:** [Module 2 test](../../assessments/module-2-test.md) (25 questions, Days 6–10) — see also [Assessments](../../assessments/index.md).

@@ -24,7 +24,7 @@ Scripts live in the repository under `scripts/linux/` and `scripts/powershell/`.
 |---|---|---|---|---|
 | 1 | `system-info.sh` | `System-Info.ps1` | Identity and inventory report | **Day 01 (available)** |
 | 2 | `process-monitor.sh` | `Process-Monitor.ps1` | Top CPU/memory processes, thresholds | **Day 08 (available)** |
-| 3 | `disk-monitor.sh` | `Disk-Monitor.ps1` | Filesystem usage with warning/critical thresholds | Day 09 |
+| 3 | `disk-monitor.sh` | `Disk-Monitor.ps1` | Filesystem usage with warning/critical thresholds | **Day 09 (available)** |
 | 4 | `dns-check.sh` | `DNS-Check.ps1` | Forward/reverse lookups across resolvers | Day 13 |
 | 5 | `port-monitor.sh` | `Port-Monitor.ps1` | Listening ports and owning processes, baseline diff | Day 14 |
 | 6 | `network-diagnostic.sh` | `Network-Diagnostic.ps1` | Layered connectivity diagnosis | Day 15 |
@@ -260,3 +260,130 @@ PID 8744 powershell: CPU 96%, memory 0.4%
 |---|---|---|
 | Executed | 2026-11-10 in an Ubuntu 24.04.5 container (Bash 5.2.21, procps-ng 4.0.4): no arguments, `-o`, `-f csv`, `-n/-c/-m/-i` values, a non-root run, invalid options/values (exit 1), unwritable `-o` (exit 2) and a busy loop above the threshold (exit 3). CI: GitHub `ubuntu-24.04` runner, every release | Executed 2026-11-10 with **PowerShell 7.4.6 on Linux** (Text/Csv/Json, `-OutputPath`, invalid values → exit 1, unwritable path → exit 2, busy loop → exit 3). **Not executed on Windows or in Windows PowerShell 5.1 before release**; CI runs it on `windows-latest` with 5.1 and 7 |
 | Static analysis | `bash -n` and ShellCheck 0.9.0 (no findings at any severity) | PSScriptAnalyzer 1.23.0: no Error/Warning/Information findings; CI re-runs it |
+
+## disk-monitor.sh / Disk-Monitor.ps1
+
+**Purpose:** a read-only, thresholded report of filesystem (volume) usage. It lists every real filesystem with size, used, available and use%, flags those at or above the **warning** (default 80%) or **critical** (default 90%) threshold — and, on Linux, those whose **inode** usage is at or above 90% — and exits with code **3** when anything is breached. Optionally it lists the largest directories directly under a path. Taught in [Day 09](../course/module-2/day-09.md) and used in [Lab 09](../labs/lab-09.md).
+
+Both scripts calculate use% the way `df` does: used ÷ (used + available), so blocks reserved for root on ext4 count as unavailable. Pseudo filesystems (`tmpfs`, `devtmpfs`, `squashfs` snaps, `overlay` and kernel interfaces) are excluded by default on Linux; on Windows only **Fixed** drives are included by default.
+
+### Prerequisites
+
+| Linux | Windows |
+|---|---|
+| Any Linux with GNU coreutils 8.21+ (`df --output`, `du`) — Ubuntu 24.04 tested — Bash 4+, `awk`, `sort`. No root needed; with `-p`, directories you cannot read are skipped and counted. | Windows 11, Windows PowerShell 5.1 or PowerShell 7. No admin: volume data comes from .NET `System.IO.DriveInfo`; folders you cannot read are skipped and counted. Also runs in PowerShell 7 on Linux (each mount point is a "drive"). |
+
+### Options
+
+| Bash | PowerShell | Default | Meaning |
+|---|---|---|---|
+| `-w WARN_PCT` | `-WarningPercent` | 80 | Warning threshold, % used (1–100) |
+| `-c CRIT_PCT` | `-CriticalPercent` | 90 | Critical threshold, % used (1–100, ≥ warning) |
+| `-i INODE_PCT` | — | 90 | Inode warning threshold (Linux only) |
+| `-a` | <code>-DriveType Fixed,Removable,Network,Ram,CDRom,Unknown</code> | real filesystems / `Fixed` | Include pseudo filesystems / other drive types |
+| `-m PATH` | `-DriveName NAME` | all | Only the filesystem holding PATH / drives whose name matches (`C`, `R:\`, `/srv/lab09`) |
+| `-p PATH` | `-FolderPath PATH` | — | Also list the largest directories directly under PATH |
+| `-n COUNT` | `-Top` | 10 | Number of directories to list (1–50) |
+| <code>-f text&#124;csv</code> | <code>-Format Text&#124;Csv&#124;Json</code> | text | Output format |
+| `-o DIR` | `-OutputPath DIR` | — | Also save a timestamped report file |
+| `-h` | `Get-Help .\Disk-Monitor.ps1 -Full` | — | Help |
+
+Exit codes: `0` OK · `1` invalid arguments · `2` output folder problem · `3` threshold breached. Levels: `OK`, `WARNING`, `CRITICAL`, and on Linux `INODES` (or `WARNING+INODES` / `CRITICAL+INODES`).
+
+### How to run
+
+```bash
+cd scripts/linux
+bash disk-monitor.sh                                   # all real filesystems
+bash disk-monitor.sh -w 70 -c 85                       # stricter thresholds
+bash disk-monitor.sh -m /var -p /var -n 5              # only /var's filesystem + its top 5 directories
+sudo bash disk-monitor.sh -p / -n 10                   # top directories of / (sudo reads everything)
+bash disk-monitor.sh -f csv -o ~/lpm-lab/reports
+bash disk-monitor.sh > /dev/null; echo "exit: $?"      # 0 = OK, 3 = WARNING/CRITICAL/INODES
+```
+
+```powershell
+Set-Location scripts\powershell
+.\Disk-Monitor.ps1
+.\Disk-Monitor.ps1 -WarningPercent 70 -CriticalPercent 85
+.\Disk-Monitor.ps1 -DriveName C -FolderPath C:\Users -Top 5
+.\Disk-Monitor.ps1 -Format Json -OutputPath $HOME\lpm-lab\reports
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Disk-Monitor.ps1 -DriveName C; "exit: $LASTEXITCODE"
+```
+
+When you call the script with `powershell.exe -File` or `pwsh -File`, pass a single drive type or name; lists such as `-DriveType Fixed,Network` are bound reliably only when you run the script from inside PowerShell (`.\Disk-Monitor.ps1 -DriveType Fixed, Network`).
+
+### Sample output (Bash; captured on 2026-11-11 in an Ubuntu 24.04.5 container during the Lab 09 scenario; host renamed)
+
+```text
+==============================================
+ Disk Monitor Report
+==============================================
+Report time (UTC)    : 2026-11-11T17:00:40Z
+Host name            : ubuntu-lab
+Filesystems          : 1 (only the one holding /srv/lab09)
+Thresholds           : space WARN >= 80%, CRIT >= 90%; inodes >= 90%
+Pseudo filesystems   : included
+Status               : CRITICAL
+
+--- Filesystems ---
+FILESYSTEM             TYPE         SIZE     USED    AVAIL  USE%  IUSE% LEVEL           MOUNTED_ON
+/dev/loop0             ext4       223.7M   195.0M    10.8M    95      1 CRITICAL        /srv/lab09
+
+--- Threshold breaches ---
+CRITICAL        /srv/lab09 used 95%, inodes 1% (/dev/loop0, ext4)
+
+--- Largest directories under /srv/lab09 (du -x, one level) ---
+    165.0M  /srv/lab09 (total)
+    120.0M  /srv/lab09/app
+     45.0M  /srv/lab09/backups
+       16K  /srv/lab09/lost+found
+        8K  /srv/lab09/reports
+Unreadable entries skipped: 0
+```
+
+The exit code was `3`. `Pseudo filesystems: included` appears because `-m` checks the requested filesystem whatever its type. The `du` total (165M) is 30M smaller than `USED` (195M) because of a deleted-but-open file — exactly the situation Lab 09 investigates. After the lab clean-up the same command reported `Status : OK` (8% used) and exit code `0`. A spool filesystem with all inodes used was reported as `INODES … used 32%, inodes 100%` (exit 3).
+
+### Sample output (PowerShell; **example** of the layout on Windows — illustrative values, not captured on Windows)
+
+```text
+==============================================
+ Disk Monitor Report
+==============================================
+Report time (UTC)    : 2026-11-11T17:05:12Z
+Computer name        : WIN11-LAB
+Volumes              : 2
+Drive types          : Fixed
+Thresholds           : WARNING >= 80%, CRITICAL >= 90% used
+Status               : WARNING
+PowerShell           : 5.1.26100.9168 (Desktop)
+
+--- Volumes ---
+Name                   FS       Type        Size(GB)   Used(GB)   Free(GB)   Use% Level     Label
+C:\                    NTFS     Fixed         236.53     162.41      74.12   68.7 OK        Windows
+R:\                    NTFS     Fixed           0.23       0.19       0.04   83.0 WARNING   LAB09
+
+--- Threshold breaches ---
+WARNING   R:\ used 83% (0.04 GB free of 0.23 GB)
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `df --output failed (GNU coreutils 8.21 or later is required)` | You are on macOS/BSD or BusyBox `df`; run on a GNU/Linux system |
+| A `/snap/...` or `tmpfs` filesystem is missing from the report | Pseudo filesystems are excluded by design; add `-a`, or `-m PATH` for one specific mount |
+| `Unreadable entries skipped` is greater than 0 | Some directories under `-p` are not readable by your user; run with `sudo` for a complete total |
+| `-p` is slow | `du` walks every file; point it at a smaller directory or run it outside business hours |
+| `IUSE%` shows `n/a` | The filesystem does not report inodes (vfat, Btrfs reports dynamic values); inode checks are skipped |
+| A network share is missing (Windows) | Only `Fixed` drives are included by default; add `-DriveType Fixed, Network` from inside PowerShell |
+| `Label` is `n/a` (Windows) | The volume has no label, or (Linux) `DriveInfo` does not provide one |
+| Script exits 3 in a scheduler and the job is marked as failed | Expected: 3 means *threshold breached*; configure the scheduler to treat 3 as a warning |
+| `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or the one-off `-ExecutionPolicy Bypass -File` form |
+
+### Validation status
+
+| Check | Linux script | PowerShell script |
+|---|---|---|
+| Executed | 2026-11-11 in an Ubuntu 24.04.5 container (Bash 5.2.21, GNU coreutils 9.4): no arguments, `-p`, `-m`, `-n`, `-f csv`, `-a`, `-o`, a non-root run with an unreadable directory (counted), invalid options and values and `-c` below `-w` (exit 1), unwritable `-o` (exit 2), a 95% loop-device filesystem and an inode-exhausted one (exit 3), and the cleaned filesystem (exit 0). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (no PowerShell available on the release host). Reviewed against the .NET `DriveInfo` and PowerShell documentation; CI parses it and runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (no arguments and `-OutputPath`) and runs PSScriptAnalyzer |
+| Static analysis | `bash -n` and ShellCheck 0.10.0 (no findings at any severity) | PSScriptAnalyzer in CI (Error and Warning severities) |

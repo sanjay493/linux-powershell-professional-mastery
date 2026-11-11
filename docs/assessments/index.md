@@ -18,6 +18,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 06 | [Users and Groups](../course/module-2/day-06.md#quiz) |
 | 07 | [File Permissions and Access Control](../course/module-2/day-07.md#quiz) |
 | 08 | [Processes and Services](../course/module-2/day-08.md#quiz) |
+| 09 | [Disk and Storage Management](../course/module-2/day-09.md#quiz) |
+| 10 | [Software and Package Management](../course/module-2/day-10.md#quiz) |
 
 ## Module tests
 
@@ -26,7 +28,7 @@ Each module test (20–25 questions: multiple choice, command-writing and a shor
 | Test | Covers | Release |
 |---|---|---|
 | [Module 1 test](module-1-test.md) | Days 1–5 | Available |
-| Module 2 test | Days 6–10 | 2026-11-11 22:00 IST |
+| [Module 2 test](module-2-test.md) | Days 6–10 | Available |
 | Module 3 test | Days 11–15 | 2026-11-14 22:00 IST |
 | Module 4 test | Days 16–20 | 2026-11-16 22:00 IST |
 | Module 5 test | Days 21–25 | 2026-11-19 22:00 IST |

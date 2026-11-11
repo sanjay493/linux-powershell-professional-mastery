@@ -190,3 +190,51 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Service config | `systemctl cat NAME` · `systemctl show NAME` | `sc.exe qc NAME` · `Get-CimInstance Win32_Service -Filter "Name='NAME'"` | |
 | Service logs | `journalctl -u NAME -n 50` | `Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'}` | |
 | Dependencies | `systemctl list-dependencies [--reverse] NAME` | `Get-Service NAME -RequiredServices` / `-DependentServices` | |
+
+## Storage
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Free space per filesystem | `df -hT -x tmpfs -x squashfs` | `Get-Volume` · `Get-PSDrive -PSProvider FileSystem` | `Get-PSDrive` also works on Linux |
+| Filesystem holding a path | `df -h PATH` · `findmnt -T PATH` | `Get-Volume -FilePath PATH` | |
+| Inodes | `df -i` | — | NTFS MFT grows dynamically |
+| Folder size | `du -sh DIR` | <code>Get-ChildItem DIR -Recurse -File -Force &#124; Measure-Object Length -Sum</code> | Blocks vs logical length |
+| Biggest sub-folders | <code>sudo du -xh -d 1 DIR &#124; sort -rh &#124; head</code> | `Get-ChildItem -Directory` + `Measure-Object` per folder | |
+| Biggest files | `find DIR -xdev -type f -size +100M -exec ls -lh {} +` | <code>Get-ChildItem -Recurse -File &#124; Sort-Object Length -Descending &#124; Select-Object -First 10</code> | |
+| Disks / partitions | `lsblk` · `sudo fdisk -l` | `Get-Disk` · `Get-Partition` · `Get-PhysicalDisk` | |
+| UUID / label / type | `lsblk -f` · `sudo blkid` | `Get-Volume` (`FileSystemType`, `FileSystemLabel`, `UniqueId`) | |
+| Mount / attach | `sudo mount DEV DIR` · `sudo losetup -f --show FILE` | `Set-Partition -NewDriveLetter` · `Mount-DiskImage` | |
+| Unmount / detach | `sudo umount DIR` | `Dismount-DiskImage` · `Remove-PartitionAccessPath` | |
+| Persistent mounts | `/etc/fstab` (UUID, `nofail`) + `sudo findmnt --verify` | Mount Manager remembers letters | |
+| Who keeps it busy? | `sudo fuser -vm DIR` · `sudo lsof +L1` | Resource Monitor handles · Sysinternals `handle.exe` | |
+| Create filesystem | `sudo mkfs.ext4 -L LABEL DEV` | `Format-Volume -FileSystem NTFS -NewFileSystemLabel LABEL` | Destructive |
+| Grow | `sudo lvextend -r -l +100%FREE VG/LV` · `growpart` + `resize2fs` | `Resize-Partition -Size (Get-PartitionSupportedSize …).SizeMax` | |
+| Check | `sudo e2fsck -n DEV` (unmounted) | `Repair-Volume -Scan` · `chkdsk C: /scan` | |
+| Swap / page file | `swapon --show` · `free -h` | `Get-CimInstance Win32_PageFileUsage` | |
+| Thresholded report | `disk-monitor.sh -m PATH -p PATH` | `Disk-Monitor.ps1 -DriveName X -FolderPath X:\` | Exit 3 on breach |
+
+## Packages
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Refresh catalogue | `sudo apt update` | `winget source update` | |
+| List upgrades | `apt list --upgradable` | `winget upgrade` | |
+| Security updates | <code>apt list --upgradable &#124; grep -- -security</code> | Windows Update history · `Get-HotFix` | |
+| Upgrade all | `sudo apt upgrade` · `sudo apt full-upgrade` | `winget upgrade --all` | |
+| Search / details | `apt search` · `apt show` · `apt policy` | `winget search` · `winget show --id ID -e` | |
+| Simulate | `apt-get -s install PKG` | `winget show` · `-WhatIf` (cmdlets) | |
+| Install | `sudo apt install PKG` · `sudo apt install ./file.deb` | `winget install --id ID -e --source winget` · `msiexec /i file.msi` | |
+| Hold / pin | `sudo apt-mark hold PKG` | `winget pin add --id ID` | |
+| Remove | `sudo apt remove PKG` | `winget uninstall --id ID -e` | |
+| Remove with config | `sudo apt purge PKG` | — | |
+| Unneeded dependencies | `sudo apt autoremove` | — | |
+| Inventory | `dpkg -l` · `dpkg-query -W` | Uninstall registry keys · `winget list` · `Get-Package` (5.1) | Never `Win32_Product` |
+| Owner of a file | `dpkg -S PATH` | — (`InstallLocation`, signature) | |
+| Files of a package | `dpkg -L PKG` | — | |
+| Verify | `dpkg --verify PKG` | `Get-AuthenticodeSignature` · `sfc /verifyonly` | |
+| History | `/var/log/apt/history.log` · `/var/log/dpkg.log` | `MsiInstaller` events 1033/1034 | |
+| Reboot required | `/var/run/reboot-required` | `RebootRequired` / `RebootPending` registry keys | |
+| Baseline export | `apt-mark showmanual` | `winget export -o apps.json` | |
+| OS components | `apt install` | `Get-WindowsOptionalFeature` · `Get-WindowsCapability` | Elevated |
+| Shell modules | — | `Install-PSResource -Scope CurrentUser` · `Install-Module -Scope CurrentUser` | PSResourceGet built into 7.4+ |
+| RHEL family | `dnf check-update` (exit 100) · `rpm -qf` · `dnf history undo` | — | |

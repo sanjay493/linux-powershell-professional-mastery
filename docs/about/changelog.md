@@ -6,6 +6,15 @@ description: "Release history of the course."
 
 All notable changes are listed here, newest first. Nightly releases add two days each.
 
+## 2026-11-11 — v0.5.0 (nightly release: Days 09–10, Module 2 complete)
+
+- **Day 09** Disk and Storage Management (the storage stack, MBR/GPT, ext4/XFS/Btrfs/NTFS/ReFS, `df` incl. `-i` and `--output`, `du -x`/`--apparent-size`, `lsblk`, `blkid`, `findmnt -T`/`--verify`, `mount`/`umount`/remount, `/etc/fstab` with `UUID=` and `nofail`, reserved blocks, inode exhaustion, deleted-but-open files with `lsof +L1`, practice loop devices, LVM `pvs`/`vgs`/`lvs`/`lvextend -r`, swap, `e2fsck -n`; `Get-PSDrive`, `Get-Volume`, `Get-Disk`, `Get-Partition`, `Get-PhysicalDisk`, `Win32_LogicalDisk`, `DriveInfo`, folder sizes with `Measure-Object`, VHDX practice disks, `Initialize-Disk`/`New-Partition`/`Format-Volume`, `Repair-Volume`, `chkdsk /scan`, WinSxS cleanup), with **Lab 09: Disk Full**.
+- **Day 10** Software and Package Management (repositories, deb822 `ubuntu.sources`, `signed-by` keyrings, `apt update`/`upgrade`/`full-upgrade`, phased and kept-back updates, `install`/`remove`/`purge`/`autoremove`, `apt-mark hold`, `dpkg -l/-L/-S/-s/--verify`, `dpkg-query`, local `.deb` packages, unattended-upgrades, `reboot-required`, history logs, snap, dnf/rpm; winget `search`/`show`/`install`/`upgrade`/`uninstall`/`list`/`export`/`import`/`pin`, the Uninstall registry keys instead of `Win32_Product`, `Get-Package` (5.1), `Get-HotFix`, pending-reboot keys, optional features and capabilities, PowerShellGet and PSResourceGet), with **Lab 10: Software Inventory**.
+- New scripts: **`disk-monitor.sh`** and **`Disk-Monitor.ps1`** (filesystem/volume usage with warning/critical thresholds, inode check on Linux, largest directories, text/CSV(/JSON) output, exit code 3 on breach), documented in the Script Library.
+- **Module 2 test** (25 questions, 38 marks, collapsible answer key and practical task) in Assessments.
+- Command reference: new **Storage** and **Packages** categories for Linux and PowerShell, plus matching comparison tables.
+- Day 08 now links to Day 09; course, module, lab, schedule and assessment indexes updated.
+
 ## 2026-11-10 — v0.4.0 (nightly release: Days 07–08)
 
 - **Day 07** File Permissions and Access Control (`ls -l`/`stat` permission strings, `chmod` numeric and symbolic incl. `X`, `chown`, `chgrp`, `umask` (0022 vs 0002 via `pam_umask`), setuid/setgid/sticky bits, `find -perm` audits, POSIX ACLs with `getfacl`/`setfacl` and `getfacl -R` backups, `chattr`/`lsattr`; NTFS DACLs, ACEs, inheritance and deny precedence, `Get-Acl`, `Set-Acl`, `FileSystemAccessRule`, `SetAccessRuleProtection`, `icacls /save /restore /grant /remove /inheritance`, `takeown`), with **Lab 07: Lock It Down**.

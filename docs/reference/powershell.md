@@ -824,3 +824,266 @@ All `*-Local*` cmdlets are in the **`Microsoft.PowerShell.LocalAccounts`** modul
 | **Common errors** | `sc query x` in 5.1 creating a file named `query` · `start=demand` without the space |
 | **Use case** | Finding which `svchost.exe` hosts a misbehaving service before restarting only that service. |
 | **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/sc-query> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tasklist> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/taskkill> |
+
+## Storage
+
+`Get-PSDrive`, `System.IO.DriveInfo` and `Get-ChildItem | Measure-Object` work in 5.1 and 7 on every OS. The **Storage module** cmdlets (`Get-Disk`, `Get-Partition`, `Get-Volume`, `Initialize-Disk`, `New-Partition`, `Format-Volume`, `Mount-DiskImage`, `Repair-Volume`…) and `Win32_LogicalDisk` are **Windows only** (5.1 and 7). Changing disks, partitions and volumes requires an elevated session.
+
+### Get-PSDrive
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS (on Linux the file system drive is `/`). Alias: `gdr` |
+| **Description** | Lists PowerShell drives; for FileSystem drives the `Used` and `Free` properties are bytes (shown as `Used (GB)` / `Free (GB)`). Also lists `HKLM:`, `Env:`, `Cert:` and other provider drives. |
+| **Syntax** | `Get-PSDrive [[-Name] <String[]>] [-PSProvider <String[]>] [-Scope <String>]` |
+| **Parameters** | `-PSProvider FileSystem` disk drives only · `-Name C` |
+| **Example** | <code>Get-PSDrive -PSProvider FileSystem &#124; Select-Object Name, @{ n = 'FreeGB'; e = { [math]::Round($_.Free / 1GB, 1) } }</code> |
+| **Expected output** | `C  162.41  74.12  FileSystem  C:\` (example) |
+| **Equivalent** | `df -h` |
+| **Common errors** | Network drives mapped in another session (elevated vs normal) not visible · expecting filesystem type (use `Get-Volume`) |
+| **Use case** | Quick free-space check that works in any PowerShell, including on Linux. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-psdrive> |
+
+### Get-Volume
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (Storage module, Windows 8 / Server 2012+) |
+| **Description** | Returns volumes with `DriveLetter`, `FriendlyName` (label), `FileSystemType`, `DriveType`, `HealthStatus`, `SizeRemaining` and `Size`. Pipes into `Get-Partition` and `Get-Disk`. |
+| **Syntax** | `Get-Volume [[-DriveLetter] <Char[]>]` · `Get-Volume -FileSystemLabel <String[]>` · `Get-Volume -FilePath <String>` |
+| **Parameters** | `-DriveLetter C` (no colon) · `-FilePath` volume holding a path · `-FileSystemLabel` |
+| **Example** | <code>Get-Volume -DriveLetter C &#124; Get-Partition &#124; Get-Disk</code> |
+| **Expected output** | `C  Windows  NTFS  Fixed  Healthy  OK  74.12 GB  236.53 GB` (example) |
+| **Equivalent** | `df -hT` · `findmnt -T PATH` |
+| **Common errors** | `The term 'Get-Volume' is not recognized` on Linux/macOS · passing `C:` instead of `C` |
+| **Use case** | Checking label, filesystem and health of every volume before a migration. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/storage/get-volume> |
+
+### Get-Disk / Get-Partition / Get-PhysicalDisk
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (Storage module). Reading usually works non-elevated; if *Access denied*, use an elevated window |
+| **Description** | `Get-Disk`: number, model, size, `PartitionStyle` (GPT/MBR/**RAW** = uninitialised), health. `Get-Partition`: disk/partition numbers, letter, offset, size, type (System, Reserved, Basic, Recovery), `AccessPaths`. `Get-PhysicalDisk`: `MediaType` (SSD/HDD), `BusType`, health. |
+| **Syntax** | `Get-Disk [[-Number] <UInt32[]>]` · `Get-Partition [-DiskNumber <UInt32[]>] [-DriveLetter <Char[]>]` · `Get-PhysicalDisk` |
+| **Parameters** | `-Number` · `-DiskNumber` · `-DriveLetter` |
+| **Example** | <code>Get-Disk &#124; Where-Object PartitionStyle -eq 'RAW'</code> |
+| **Expected output** | `0  Samsung SSD 980 1TB  …  Healthy  Online  931.51 GB  GPT` (example) |
+| **Equivalent** | `lsblk` · `sudo fdisk -l` · `lsblk -d -o NAME,ROTA,TRAN,MODEL` |
+| **Common errors** | Confusing disk numbers between `Get-Disk` and Disk Management after adding disks — always re-query |
+| **Use case** | Finding the new, empty disk before initialising it. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/storage/get-disk> · <https://learn.microsoft.com/en-us/powershell/module/storage/get-partition> |
+
+### Win32_LogicalDisk / System.IO.DriveInfo
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | `Win32_LogicalDisk` via `Get-CimInstance`: 5.1, 7.x on Windows (remote-capable). `[System.IO.DriveInfo]::GetDrives()`: 5.1, 7.x on all OS |
+| **Description** | Classic WMI view of drives (`DeviceID`, `VolumeName`, `Size`, `FreeSpace`, `DriveType` 2/3/4/5) and the .NET drive list (`TotalSize`, `TotalFreeSpace`, `AvailableFreeSpace`, `DriveFormat`). |
+| **Syntax** | `Get-CimInstance -ClassName Win32_LogicalDisk [-Filter <String>] [-ComputerName <String[]>]` · `[System.IO.DriveInfo]::GetDrives()` |
+| **Parameters** | `-Filter "DriveType=3"` local fixed disks · `-ComputerName` / `-CimSession` remote |
+| **Example** | `Get-CimInstance Win32_LogicalDisk -Filter "DriveType=3" -ComputerName SRV01` |
+| **Expected output** | `C:  Windows  236.5  74.1` (example, after a calculated-property `Select-Object`) |
+| **Equivalent** | `df -h` · `ssh host df -h` |
+| **Common errors** | Dividing by 1GB without rounding · `FreeSpace` vs `AvailableFreeSpace` under quotas |
+| **Use case** | Free-space report across many servers (Day 26); the course's `Disk-Monitor.ps1` uses `DriveInfo`. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-logicaldisk> · <https://learn.microsoft.com/en-us/dotnet/api/system.io.driveinfo> |
+
+### Folder size: Get-ChildItem + Measure-Object
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | PowerShell has no `du` cmdlet; sum `Length` of all files. `Length` is the **logical** size (like `du --apparent-size`); compressed, sparse and cloud placeholder files report their full length. |
+| **Syntax** | <code>Get-ChildItem -Path &lt;String&gt; -Recurse -File -Force -ErrorAction SilentlyContinue &#124; Measure-Object -Property Length -Sum</code> |
+| **Parameters** | `-File` files only · `-Force` hidden/system · `-ErrorAction SilentlyContinue` skip *Access denied* (incomplete total) · `-Maximum` largest file |
+| **Example** | <code>Get-ChildItem C:\Logs -Recurse -File &#124; Sort-Object Length -Descending &#124; Select-Object -First 10 FullName, Length</code> |
+| **Expected output** | `Count 200  Sum 1692  Maximum 10` (example) |
+| **Equivalent** | `du -sh` · <code>du -xh -d 1 &#124; sort -rh</code> · `find -size +100M` |
+| **Common errors** | Forgetting `-Force` · counting junction targets twice in 5.1 · very slow on millions of files |
+| **Use case** | Finding the share or profile folder responsible for a full data volume. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/measure-object> |
+
+### Initialize-Disk / New-Partition / Format-Volume / Resize-Partition
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** · **elevated** · **destructive** |
+| **Description** | Prepare a RAW disk (partition table), create a partition with a letter, create a filesystem, and grow a partition into free space. |
+| **Syntax** | <code>Initialize-Disk -Number &lt;UInt32&gt; [-PartitionStyle GPT&#124;MBR]</code> · <code>New-Partition -DiskNumber &lt;UInt32&gt; (-Size &lt;UInt64&gt; &#124; -UseMaximumSize) [-AssignDriveLetter]</code> · `Format-Volume [-DriveLetter <Char>] -FileSystem NTFS -NewFileSystemLabel <String>` · `Resize-Partition -DriveLetter <Char> -Size <UInt64>` |
+| **Parameters** | `-PartitionStyle GPT` · `-UseMaximumSize` · `-AssignDriveLetter` · `-FileSystem NTFS/ReFS/exFAT/FAT32` · `-Confirm:$false` (scripts only) · `Get-PartitionSupportedSize` for `SizeMax` |
+| **Example** | <code>New-Partition -DiskNumber 2 -UseMaximumSize -AssignDriveLetter &#124; Format-Volume -FileSystem NTFS -NewFileSystemLabel LAB09</code> |
+| **Expected output** | Volume object: `R  LAB09  NTFS  Fixed  Healthy  OK  …` (example) |
+| **Equivalent** | `parted`/`fdisk` · `mkfs.ext4` · `growpart` + `resize2fs` / `lvextend -r` |
+| **Common errors** | Targeting the wrong disk number · *The disk has not been initialized* (run `Initialize-Disk`) · *Access denied* (not elevated) |
+| **Use case** | Preparing a new data disk on a VM; practising on a VHDX file. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/storage/initialize-disk> · <https://learn.microsoft.com/en-us/powershell/module/storage/new-partition> · <https://learn.microsoft.com/en-us/powershell/module/storage/format-volume> · <https://learn.microsoft.com/en-us/powershell/module/storage/resize-partition> |
+
+### Mount-DiskImage / Dismount-DiskImage
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**; VHD/VHDX need elevation (ISO mounting does not) |
+| **Description** | Attaches or detaches ISO, VHD and VHDX files. Create a practice VHDX with `diskpart` (`create vdisk file=… maximum=256 type=expandable`) or *Settings → Storage → Disks & volumes → Create VHD*; `New-VHD` needs the Hyper-V module. |
+| **Syntax** | `Mount-DiskImage -ImagePath <String[]>` · `Dismount-DiskImage -ImagePath <String[]>` · <code>Get-DiskImage -ImagePath &lt;String&gt; &#124; Get-Disk</code> |
+| **Parameters** | `-ImagePath` full path · `-Access ReadOnly` |
+| **Example** | `Mount-DiskImage -ImagePath C:\lab09\lab09.vhdx` |
+| **Expected output** | `Attached : True  ImagePath : C:\lab09\lab09.vhdx  …` (example) |
+| **Equivalent** | `losetup -f --show FILE` · `mount -o loop` |
+| **Common errors** | Relative paths (use full paths) · deleting the file while it is attached |
+| **Use case** | Safe practice disk for partitioning and formatting labs. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/storage/mount-diskimage> |
+
+### Repair-Volume / chkdsk / Optimize-Volume
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** · **elevated** |
+| **Description** | `Repair-Volume -Scan` scans NTFS online; `-SpotFix` fixes logged problems with a brief dismount; `-OfflineScanAndFix` takes the volume offline. `chkdsk X: /scan` is the native online scan. `Optimize-Volume -Analyze` reports fragmentation; SSDs get TRIM (`-ReTrim`). |
+| **Syntax** | <code>Repair-Volume -DriveLetter &lt;Char&gt; (-Scan &#124; -SpotFix &#124; -OfflineScanAndFix)</code> · `chkdsk C: /scan` · `Optimize-Volume -DriveLetter C -Analyze -Verbose` |
+| **Parameters** | `-Scan` · `-SpotFix` · `-OfflineScanAndFix` · `chkdsk /f` (fix, exclusive access) |
+| **Example** | `Repair-Volume -DriveLetter D -Scan` |
+| **Expected output** | `NoErrorsFound` (example) |
+| **Equivalent** | `e2fsck -n` (unmounted) · `smartctl -H` (disk health) |
+| **Common errors** | Running `chkdsk /f` on evidence (changes data) · interrupting a repair |
+| **Use case** | Checking a volume after storage errors appear in the System log. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/storage/repair-volume> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/chkdsk> |
+
+## Packages & Software
+
+`winget` is a native Windows tool (Windows 10 1809+ / 11, part of App Installer) and works the same from 5.1, 7 and cmd. The registry inventory, `Get-HotFix` and the DISM feature cmdlets are **Windows only**. PSResourceGet is **built into PowerShell 7.4+** and can be installed on 5.1; PowerShellGet works in both (5.1 ships the old 1.0.0.1).
+
+### winget search / show
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows 10 1809+ / 11 (App Installer) · from any shell |
+| **Description** | Search the `winget` and `msstore` sources; `show` prints the manifest including publisher, license, installer type, **installer URL and SHA-256**. |
+| **Syntax** | `winget search <query> [--id <id>] [--source <source>] [-e]` · `winget show --id <id> [-e] [--versions]` |
+| **Parameters** | `--id` · `-e` (`--exact`) · `--source winget` · `--versions` |
+| **Example** | `winget show --id Git.Git -e` |
+| **Expected output** | `Found Git [Git.Git]` / `Installer SHA256: …` (example) |
+| **Equivalent** | `apt search` · `apt show` · `apt policy` |
+| **Common errors** | `Failed when searching source: msstore` (use `--source winget`) · ambiguous free-text queries |
+| **Use case** | Recording the exact package ID and installer hash in a change ticket. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/package-manager/winget/search> · <https://learn.microsoft.com/en-us/windows/package-manager/winget/show> |
+
+### winget install / upgrade / uninstall
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows 10 1809+ / 11 · machine-wide installers trigger UAC |
+| **Description** | Downloads the vendor installer, verifies its SHA-256 against the manifest, installs silently; `upgrade` with no arguments lists available upgrades. Exit code 0 on success, HRESULT-style codes (for example `0x8A150014` no package found) on failure. |
+| **Syntax** | <code>winget install --id &lt;id&gt; [-e] [--version &lt;v&gt;] [--scope user&#124;machine] [--source &lt;s&gt;] [--silent] [--accept-package-agreements] [--accept-source-agreements]</code> · <code>winget upgrade [--id &lt;id&gt; -e &#124; --all] [--include-unknown]</code> · `winget uninstall --id <id> -e` |
+| **Parameters** | `--id … -e` exact · `--source winget` · `--scope` · `--silent` · `--all` · `--include-unknown` |
+| **Example** | `winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements` |
+| **Expected output** | `Successfully verified installer hash` / `Successfully installed` (example) |
+| **Equivalent** | `apt install` · `apt upgrade` · `apt remove` |
+| **Common errors** | `No package found matching input criteria.` · `Installer hash does not match` (do not override) · `winget` not recognised (update App Installer) |
+| **Use case** | Scripted workstation builds and monthly application updates. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/package-manager/winget/install> · <https://learn.microsoft.com/en-us/windows/package-manager/winget/upgrade> · <https://learn.microsoft.com/en-us/windows/package-manager/winget/uninstall> |
+
+### winget list / export / import / pin
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows 10 1809+ / 11 · `pin` needs winget 1.5+ |
+| **Description** | `list` shows installed apps (also those not installed by winget); `export`/`import` save and restore an app list as JSON; `pin` prevents upgrades of a package. |
+| **Syntax** | `winget list [--id <id> -e]` · `winget export -o <file.json>` · `winget import -i <file.json>` · `winget pin add --id <id>` · `winget pin list` · `winget pin remove --id <id>` |
+| **Parameters** | `-o` output file · `-i` import file · `--accept-package-agreements` |
+| **Example** | `winget export -o $HOME\winget-apps.json` |
+| **Expected output** | `Exported package(s) to: C:\Users\student\winget-apps.json` (example) |
+| **Equivalent** | <code>apt-mark showmanual &gt; list</code> · `apt-mark hold` |
+| **Common errors** | Expecting `list` to match the registry inventory exactly · forgotten pins |
+| **Use case** | Rebuilding a role-based workstation in minutes. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/package-manager/winget/export> · <https://learn.microsoft.com/en-us/windows/package-manager/winget/pinning> |
+
+### Uninstall registry keys (software inventory)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** · no admin needed |
+| **Description** | The data behind *Installed apps*. Three locations: 64-bit machine-wide, 32-bit (`WOW6432Node`) and per-user (`HKCU`). Values: `DisplayName`, `DisplayVersion`, `Publisher`, `InstallDate`, `UninstallString`, `EstimatedSize` (KB), `SystemComponent`. **Use instead of `Win32_Product`**, whose enumeration triggers MSI consistency checks and repairs. |
+| **Syntax** | <code>Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\&#42;', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\&#42;', 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\&#42;' -ErrorAction SilentlyContinue</code> |
+| **Parameters** | Filter with `Where-Object { $_.DisplayName -and -not $_.SystemComponent }` |
+| **Example** | <code>… &#124; Select-Object DisplayName, DisplayVersion, Publisher &#124; Export-Csv inventory.csv -NoTypeInformation</code> |
+| **Expected output** | `Git  2.47.1  The Git Development Community` (example) |
+| **Equivalent** | `dpkg -l` · `dpkg-query -W` · `rpm -qa` |
+| **Common errors** | Reading only one of the three keys · `Win32_Product` side effects |
+| **Use case** | Vulnerability and licence audits across many PCs (with `Invoke-Command`, Day 26). |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/win32/msi/uninstall-registry-key> |
+
+### Get-Package (PackageManagement)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 (Windows) with `msi` and `Programs` providers · 7.x: only NuGet/PowerShellGet providers |
+| **Description** | Lists installed software known to PackageManagement providers: MSI products (without `Win32_Product` side effects), Programs (Uninstall entries) and PowerShell modules. |
+| **Syntax** | `Get-Package [[-Name] <String[]>] [-ProviderName <String[]>]` |
+| **Parameters** | `-ProviderName msi, Programs, PowerShellGet` |
+| **Example** | <code>Get-Package -ProviderName Programs, msi &#124; Sort-Object Name</code> |
+| **Expected output** | `Name Version Source ProviderName` / `Git 2.47.1  Programs` (example) |
+| **Equivalent** | `dpkg -l` |
+| **Common errors** | Empty results in PowerShell 7 (providers missing) |
+| **Use case** | Quick inventory in Windows PowerShell 5.1 sessions. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/packagemanagement/get-package> |
+
+### Get-HotFix / pending reboot
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (`Win32_QuickFixEngineering`) |
+| **Description** | Lists installed Windows updates with `HotFixID`, `Description`, `InstalledOn`. Not every update type appears (Defender definitions, Store apps). Pending reboot: registry keys `…\WindowsUpdate\Auto Update\RebootRequired` and `…\Component Based Servicing\RebootPending`. |
+| **Syntax** | `Get-HotFix [[-Id] <String[]>] [-ComputerName <String[]>]` |
+| **Parameters** | `-Id KB5046617` · `-ComputerName` |
+| **Example** | <code>Get-HotFix &#124; Sort-Object InstalledOn -Descending &#124; Select-Object -First 5</code> |
+| **Expected output** | `KB5046617  Security Update  13-11-2026` (example) |
+| **Equivalent** | `apt list --upgradable` · `/var/log/apt/history.log` · `/var/run/reboot-required` |
+| **Common errors** | `InstalledOn` empty for some entries · treating it as the full update history |
+| **Use case** | Confirming a critical KB is installed on all servers. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-hotfix> |
+
+### Get-WindowsOptionalFeature / Get-WindowsCapability
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (DISM module) · **elevated** |
+| **Description** | Optional features (Hyper-V, WSL, Telnet client…) and Features on Demand (OpenSSH client/server, RSAT). Windows Server roles use `Get-WindowsFeature` / `Install-WindowsFeature`. |
+| **Syntax** | `Get-WindowsOptionalFeature -Online [-FeatureName <String>]` · `Enable-WindowsOptionalFeature -Online -FeatureName <String>` · `Get-WindowsCapability -Online [-Name <String>]` · `Add-WindowsCapability -Online -Name <String>` |
+| **Parameters** | `-Online` running OS · `-NoRestart` |
+| **Example** | `Get-WindowsCapability -Online -Name OpenSSH*` |
+| **Expected output** | `Name : OpenSSH.Client~~~~0.0.1.0  State : Installed` (example) |
+| **Equivalent** | `apt install` (on Linux everything is a package) |
+| **Common errors** | `The requested operation requires elevation` · forgetting the required restart |
+| **Use case** | Hardening: listing and disabling unused features. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/dism/get-windowsoptionalfeature> · <https://learn.microsoft.com/en-us/powershell/module/dism/get-windowscapability> |
+
+### Install-PSResource and PSResourceGet
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Built into PowerShell 7.4+** · 5.1 after `Install-Module Microsoft.PowerShell.PSResourceGet -Scope CurrentUser` · all OS |
+| **Description** | The successor to PowerShellGet for finding, installing, updating, saving and removing modules and scripts. Default scope `CurrentUser`; `PSGallery` is untrusted by default (prompt). |
+| **Syntax** | `Find-PSResource -Name <String[]>` · <code>Install-PSResource -Name &lt;String[]&gt; [-Version &lt;String&gt;] [-Scope CurrentUser&#124;AllUsers]</code> · `Get-InstalledPSResource` · `Update-PSResource` · `Uninstall-PSResource` · `Save-PSResource -Path <String>` · `Set-PSResourceRepository -Name <String> -Trusted` |
+| **Parameters** | `-Version '[1.0,2.0)'` NuGet range · `-Repository` · `-TrustRepository` (this call only) · `-Path` (save) |
+| **Example** | `Save-PSResource -Name PSScriptAnalyzer -Path .\review` then `Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser` |
+| **Expected output** | `Untrusted repository … Are you sure you want to install the PSResource from 'PSGallery'?` (example) |
+| **Equivalent** | `pip install --user` (language ecosystems) · `apt install` |
+| **Common errors** | `Install-PSResource` not recognised in 5.1 · trusting the public Gallery everywhere |
+| **Use case** | Installing reviewed, pinned module versions from an internal repository. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.psresourceget/install-psresource> |
+
+### Install-Module and PowerShellGet
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 (ships PowerShellGet **1.0.0.1**: update it first), 7.x (2.2.5) · all OS |
+| **Description** | Classic module management from the PowerShell Gallery. Default scope: `AllUsers` in PowerShellGet 1.x (needs elevation), `CurrentUser` in 2.x — always pass `-Scope`. |
+| **Syntax** | `Find-Module -Name <String[]>` · <code>Install-Module -Name &lt;String[]&gt; [-Scope CurrentUser&#124;AllUsers] [-RequiredVersion &lt;String&gt;]</code> · `Get-InstalledModule` · `Update-Module` · `Uninstall-Module` · `Save-Module -Path <String>` |
+| **Parameters** | `-Scope` · `-RequiredVersion` / `-MinimumVersion` · `-Repository` · `-Force` (reinstall; avoid in production scripts) |
+| **Example** | `Install-Module -Name PSScriptAnalyzer -Scope CurrentUser` |
+| **Expected output** | `Untrusted repository … Are you sure you want to install the modules from 'PSGallery'?` (example) |
+| **Equivalent** | `Install-PSResource` |
+| **Common errors** | `Unable to resolve package source` (enable TLS 1.2 in 5.1, update PowerShellGet) · *Administrator rights are required* with `AllUsers` |
+| **Use case** | Installing PSScriptAnalyzer for script linting (Days 21–25). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/powershellget/install-module> |

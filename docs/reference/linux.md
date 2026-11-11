@@ -858,3 +858,232 @@ Platform: **Ubuntu 24.04 LTS**, Bash 5.2, GNU coreutils 9.4. Commands marked *GN
 | **Common errors** | `No journal files were found` / partial output without group membership · forgetting `--no-pager` in scripts |
 | **Use case** | Finding why a service failed to start. |
 | **Docs** | <https://man7.org/linux/man-pages/man1/journalctl.1.html> |
+
+## Storage
+
+### df
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (GNU coreutils). `--output` is GNU-only and cannot be combined with `-P` |
+| **Description** | Reports size, used, available space and use% (or inodes with `-i`) for each mounted filesystem, by asking the filesystem itself (`statfs`). `Use%` = Used ÷ (Used + Avail), rounded up; ext4's 5% root reserve is not in `Avail`. |
+| **Syntax** | <code>df [-h &#124; -H] [-T] [-i] [-t TYPE] [-x TYPE] [-l] [--output=FIELDS] [FILE...]</code> |
+| **Parameters** | `-h` human (1024) · `-H` (1000) · `-T` type · `-i` inodes · `-x tmpfs -x squashfs` exclude types · `-l` local only · `FILE` = only the filesystem holding it |
+| **Example** | `df -hT -x tmpfs -x squashfs` · `df -i /var` |
+| **Expected output** | `/dev/loop0  ext4  172M  24K  158M  1% /mnt/lab09` (captured, practice loop device) |
+| **Equivalent** | `Get-Volume` · `Get-PSDrive -PSProvider FileSystem` · `Win32_LogicalDisk` |
+| **Common errors** | Alerting on squashfs `/snap/*` (always 100%) · hanging on a dead NFS mount (use `df -l` or `timeout`) · forgetting inodes |
+| **Use case** | First check for a "disk full" alert. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/df.1.html> |
+
+### du
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (GNU coreutils) |
+| **Description** | Walks directories and adds up the **allocated** size of the files it can read. Slow on large trees; incomplete without read permission. |
+| **Syntax** | `du [-s] [-h] [-a] [-c] [-x] [-d N] [-t SIZE] [--apparent-size] [--exclude=PATTERN] [FILE...]` |
+| **Parameters** | `-s` summary · `-h` human · `-d 1` one level · `-x` one filesystem · `-a` include files · `-t 100M` threshold · `--apparent-size` file length instead of blocks |
+| **Example** | <code>sudo du -xh -d 1 /var 2&gt;/dev/null &#124; sort -rh &#124; head</code> |
+| **Expected output** | `98M /mnt/lab09` · `73M /mnt/lab09/app` · `26M /mnt/lab09/backups` (captured) |
+| **Equivalent** | <code>Get-ChildItem -Recurse -File -Force &#124; Measure-Object Length -Sum</code> |
+| **Common errors** | `du /` without `-x` (counts `/proc` and other mounts) · `Permission denied` noise (run with `sudo`) · comparing with `ls -l` for sparse files |
+| **Use case** | Drilling down from a full mount point to the directory and file responsible. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/du.1.html> |
+
+### lsblk / blkid
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (util-linux). `lsblk` filesystem columns come from udev (may be empty in containers); `blkid` reads devices (root for uncached ones) |
+| **Description** | `lsblk` prints disks, partitions, LVM volumes and loop devices as a tree with size, type and mount points; `blkid` prints filesystem `TYPE`, `UUID`, `LABEL` and `PARTUUID`. |
+| **Syntax** | `lsblk [-f] [-d] [-p] [-o COLUMNS] [DEVICE...]` · `blkid [-s TAG] [-o value] [DEVICE...]` |
+| **Parameters** | `-f` FSTYPE/LABEL/UUID/FSAVAIL/FSUSE% · `-d` disks only · `-o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS,ROTA,MODEL` · `blkid -s UUID -o value DEV` UUID only |
+| **Example** | `lsblk -f` · `sudo blkid -s UUID -o value /dev/sdb1` |
+| **Expected output** | `/dev/loop0: LABEL="lab09data" UUID="68ba8b44-…" BLOCK_SIZE="4096" TYPE="ext4"` (captured) |
+| **Equivalent** | `Get-Disk` · `Get-Partition` · `Get-Volume` |
+| **Common errors** | Confusing a disk (`sda`) with a partition (`sda1`) before `mkfs` · NVMe partition names need `p` (`nvme0n1p1`) |
+| **Use case** | Identifying a newly attached disk safely before partitioning it. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/lsblk.8.html> · <https://man7.org/linux/man-pages/man8/blkid.8.html> |
+
+### findmnt
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (util-linux). `--real` needs util-linux 2.38+ (Ubuntu 24.04 has 2.39) |
+| **Description** | Shows mounted filesystems as a tree from `/proc/self/mountinfo`; finds the filesystem holding a path; `--verify` checks `/etc/fstab`. |
+| **Syntax** | `findmnt [-T PATH] [-t TYPES] [--real] [-o COLUMNS] [-n] [-r] [TARGET]` · `findmnt --verify [--tab-file FILE]` |
+| **Parameters** | `-T` (`--target`) path · `-t ext4,xfs` types · `-o TARGET,SOURCE,FSTYPE,OPTIONS` · `-n` no header · `--verify` fstab check (exit 1 on errors) |
+| **Example** | `findmnt -T /var/log` · `sudo findmnt --verify` |
+| **Expected output** | `Success, no errors or warnings detected` (captured) · `[E] unreachable on boot required source: UUID=0000-bad` (captured, deliberately wrong line) |
+| **Equivalent** | `Get-Volume -FilePath PATH` · `Get-Partition` (`AccessPaths`) · `mountvol` |
+| **Common errors** | Rebooting after an fstab edit without `--verify` and `mount -a` |
+| **Use case** | Confirming mount options such as `nodev,nosuid,noexec` on `/tmp` during a hardening audit. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/findmnt.8.html> |
+
+### mount / umount / fstab
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (util-linux; systemd generates `.mount` units from `/etc/fstab`) |
+| **Description** | `mount` attaches a filesystem to a directory, `umount` detaches it. `/etc/fstab` lists mounts for every boot: spec, mount point, type, options, dump, pass. |
+| **Syntax** | `mount [-t TYPE] [-o OPTIONS] DEVICE DIR` · `mount -o remount,OPTIONS DIR` · `mount -a` · `umount DIR` |
+| **Parameters** | `-o ro,noexec,nosuid,nodev` · `remount` · `-a` all fstab entries · fstab options `defaults`, `nofail`, `x-systemd.device-timeout=10s` |
+| **Example** | `sudo mount -o ro,noexec /dev/sdb1 /mnt/evidence` · fstab: `UUID=…  /srv/data  ext4  defaults,nofail  0  2` |
+| **Expected output** | `umount: /mnt/lab09: target is busy.` (captured; find the user with `fuser -vm`) |
+| **Equivalent** | Drive letters (`Set-Partition -NewDriveLetter`) · `Mount-DiskImage` · `Add-PartitionAccessPath` |
+| **Common errors** | fstab by `/dev/sdX` without `nofail` (emergency mode) · forgetting `systemctl daemon-reload` · `umount -l` hiding a busy filesystem |
+| **Use case** | Adding a data disk that survives reboots and device renaming. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/mount.8.html> · <https://man7.org/linux/man-pages/man5/fstab.5.html> |
+
+### lsof +L1 / fuser -vm
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (`lsof` package; `fuser` in psmisc) — both installed by default on Ubuntu |
+| **Description** | `lsof +L1` lists open files with link count < 1 (**deleted but still open**), which keep using disk space; `fuser -vm DIR` lists processes using a mounted filesystem. |
+| **Syntax** | `lsof +L1 [PATH]` · `lsof PATH` · `fuser -vm DIR` |
+| **Parameters** | `+L1` link count below 1 · `-p PID` · `fuser -v` verbose · `-m` whole mounted filesystem |
+| **Example** | <code>sudo lsof +L1 &#124; grep -E 'COMMAND&#124;/var/log'</code> |
+| **Expected output** | `sleep 1055 root 3r REG 7,0 62914560 0 16 /mnt/lab09/app/logs/app.log (deleted)` (captured) |
+| **Equivalent** | Resource Monitor → Associated Handles · Sysinternals `handle.exe` |
+| **Common errors** | Running without `sudo` (other users' processes invisible) · deleting more files instead of restarting the owner |
+| **Use case** | Explaining why deleting a 20 GB log freed no space. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/lsof.8.html> · <https://man7.org/linux/man-pages/man1/fuser.1.html> |
+
+### pvs / vgs / lvs / lvextend
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux with LVM2 (default layout of the Ubuntu Server installer: `ubuntu-vg/ubuntu-lv`) |
+| **Description** | Show physical volumes, volume groups (with free space `VFree`) and logical volumes; `lvextend -r` grows an LV and its filesystem online. |
+| **Syntax** | `pvs` · `vgs` · `lvs` · <code>lvextend -r (-L +SIZE &#124; -l +100%FREE) VG/LV</code> |
+| **Parameters** | `-r` (`--resizefs`) also resize the filesystem · `-L +10G` add size · `-l +100%FREE` all free extents |
+| **Example** | `sudo vgs` then `sudo lvextend -r -l +100%FREE /dev/ubuntu-vg/ubuntu-lv` |
+| **Expected output** | `VG #PV #LV #SN Attr VSize VFree` / `ubuntu-vg 1 1 0 wz--n- <97.00g <48.50g` (example) |
+| **Equivalent** | Storage Spaces (`Get-StoragePool`, `Get-VirtualDisk`) · `Resize-Partition` |
+| **Common errors** | Growing the LV without `-r` (filesystem still small) · trying to shrink XFS (impossible) |
+| **Use case** | Giving a new server's root filesystem the disk space the installer left unallocated. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/lvextend.8.html> · <https://man7.org/linux/man-pages/man8/vgs.8.html> |
+
+### losetup / mkfs.ext4 / tune2fs / e2fsck
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (util-linux, e2fsprogs) |
+| **Description** | `losetup` turns a file into a block device for safe practice; `mkfs.ext4` creates a filesystem (**destroys data**); `tune2fs -l` shows superblock data (reserved blocks, inode count); `e2fsck -n` checks an **unmounted** filesystem read-only. |
+| **Syntax** | `losetup -f --show FILE` · `losetup -d DEV` · `mkfs.ext4 [-L LABEL] [-m PCT] [-N INODES] DEV` · `tune2fs -l DEV` · `e2fsck -n DEV` |
+| **Parameters** | `-f --show` first free device, print it · `-L` label · `-m 1` 1% reserve · `-N` inode count · `-n` no changes |
+| **Example** | `truncate -s 200M lab.img && sudo losetup -f --show lab.img` → `sudo mkfs.ext4 -L lab /dev/loop0` |
+| **Expected output** | `/dev/loop0` · `Reserved block count: 2560` (captured) |
+| **Equivalent** | VHDX + `Initialize-Disk`/`New-Partition`/`Format-Volume` · `Repair-Volume -Scan` · `chkdsk /scan` |
+| **Common errors** | `mkfs` on the wrong device · `fsck` on a mounted filesystem · inode count cannot be raised later |
+| **Use case** | Practising partitioning, formatting and fstab without risking a real disk. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/losetup.8.html> · <https://man7.org/linux/man-pages/man8/mke2fs.8.html> · <https://man7.org/linux/man-pages/man8/tune2fs.8.html> · <https://man7.org/linux/man-pages/man8/e2fsck.8.html> |
+
+## Packages
+
+### apt update / upgrade / full-upgrade
+
+| Field | Detail |
+|---|---|
+| **OS** | Debian, Ubuntu (APT 2.8 on 24.04). Use `apt-get` in scripts (stable output) |
+| **Description** | `update` refreshes and verifies repository indexes (installs nothing); `upgrade` installs newer versions without removing packages; `full-upgrade` may add or remove packages. |
+| **Syntax** | `apt update` · `apt list --upgradable` · `apt upgrade [-s] [-y]` · `apt full-upgrade [-s] [-y]` |
+| **Parameters** | `-s` simulate · `-y` assume yes · `apt-get -s upgrade` script preview |
+| **Example** | <code>sudo apt update &amp;&amp; apt list --upgradable 2&gt;/dev/null &#124; grep -c -- -security</code> |
+| **Expected output** | `apt/noble-updates,noble-security 2.8.4ubuntu0.1 amd64 [upgradable from: 2.8.3]` (captured) |
+| **Equivalent** | `winget upgrade` · Windows Update · `dnf check-update` / `dnf upgrade` |
+| **Common errors** | `Could not get lock /var/lib/dpkg/lock-frontend` (unattended-upgrades running: wait) · `NO_PUBKEY` · *kept back* / phased updates |
+| **Use case** | Weekly patch review with a security-update count. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/apt.8.html> · <https://documentation.ubuntu.com/server/how-to/software/package-management/> |
+
+### apt install / remove / purge / autoremove
+
+| Field | Detail |
+|---|---|
+| **OS** | Debian, Ubuntu |
+| **Description** | Install packages with dependencies (also local `./file.deb`); `remove` keeps conffiles (`rc`), `purge` deletes them; `autoremove` removes automatic dependencies nothing needs (and old kernels). |
+| **Syntax** | <code>apt install [-s] [-y] [--no-install-recommends] PKG[=VER]... &#124; ./FILE.deb</code> · <code>apt remove &#124; purge &#124; autoremove [-s] [PKG]</code> |
+| **Parameters** | `-s` simulate · `PKG=VERSION` exact version · `--only-upgrade` · `--no-install-recommends` |
+| **Example** | `apt-get -s install tree && sudo apt install tree` |
+| **Expected output** | `Inst tree (2.1.1-2ubuntu3.24.04.2 Ubuntu:24.04/noble-updates [amd64])` (captured) |
+| **Equivalent** | `winget install` / `winget uninstall` · `dnf install` / `dnf remove` |
+| **Common errors** | `dpkg -i` without dependency resolution · blind `autoremove -y` · `remove` instead of `purge` to reset configs |
+| **Use case** | Installing a diagnostic tool with a simulated preview in a change ticket. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/apt-get.8.html> |
+
+### apt search / show / policy
+
+| Field | Detail |
+|---|---|
+| **OS** | Debian, Ubuntu (`apt-cache` equivalents for scripts) |
+| **Description** | Find packages, show metadata (size, dependencies, `APT-Sources`), and show installed/candidate versions with their repositories and priorities. |
+| **Syntax** | `apt search [--names-only] REGEX` · `apt show PKG` · `apt policy [PKG]` · `apt-cache madison PKG` · <code>apt-cache depends &#124; rdepends PKG</code> |
+| **Parameters** | `--names-only` · `rdepends --installed` |
+| **Example** | `apt policy openssh-server` |
+| **Expected output** | `Installed: (none)` / `Candidate: 2.1.1-2ubuntu3.24.04.2` / `500 http://archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages` (captured for `tree`) |
+| **Equivalent** | `winget search` · `winget show --id ID -e` · `dnf info` |
+| **Common errors** | Piping `apt` output in scripts (unstable CLI warning) · package in a disabled component (`universe`) |
+| **Use case** | Checking which repository a security fix will come from. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/apt.8.html> · <https://manpages.ubuntu.com/manpages/noble/man8/apt-cache.8.html> |
+
+### apt-mark
+
+| Field | Detail |
+|---|---|
+| **OS** | Debian, Ubuntu |
+| **Description** | Holds packages at their version and sets or shows the manual/automatic install reason that `autoremove` uses. |
+| **Syntax** | <code>apt-mark hold &#124; unhold &#124; showhold &#124; showmanual &#124; showauto &#124; manual &#124; auto [PKG...]</code> |
+| **Parameters** | `hold` freeze · `showhold` list holds · `showmanual` baseline list · `auto`/`manual` change reason |
+| **Example** | `sudo apt-mark hold postgresql-16` · `apt-mark showmanual > manual-packages.txt` |
+| **Expected output** | `tree set on hold.` · `dpkg -l` status `hi` (captured) |
+| **Equivalent** | `winget pin add --id ID` · `dnf versionlock` (plugin) |
+| **Common errors** | Forgotten holds becoming unpatched packages · a needed tool marked `auto` and autoremoved |
+| **Use case** | Freezing a database version until a planned upgrade window. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/apt-mark.8.html> |
+
+### dpkg -l / -L / -S / -s / --verify
+
+| Field | Detail |
+|---|---|
+| **OS** | Debian, Ubuntu (dpkg 1.22 on 24.04) |
+| **Description** | Queries the installed-package database: list with status, files of a package, owner of a file, metadata, and checksum verification of installed files. |
+| **Syntax** | `dpkg -l [PATTERN]` · `dpkg -L PKG` · `dpkg -S PATH` · `dpkg -s PKG` · `dpkg --verify [PKG]` · `dpkg-query -W -f='${Package}\t${Version}\n'` |
+| **Parameters** | Status letters `ii`, `rc`, `hi`, `iU`/`iF` · `--verify` flags `??5??????` (checksum) and `c` (conffile) |
+| **Example** | `dpkg -S /usr/bin/ls` · `dpkg --verify openssh-server` |
+| **Expected output** | `coreutils: /usr/bin/ls` · `??5?????? c /etc/lab10-hello/hello.conf` (captured) |
+| **Equivalent** | Uninstall registry keys · `Get-AuthenticodeSignature` · `rpm -qa / -ql / -qf / -V` |
+| **Common errors** | `dpkg -L` with a path (it takes a package name) · `--verify` exits 0 even when it prints differences |
+| **Use case** | Spotting a modified binary or an executable that no package owns during an investigation. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/dpkg.1.html> · <https://man7.org/linux/man-pages/man1/dpkg-query.1.html> |
+
+### snap
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu (snapd installed by default); available on other distributions |
+| **Description** | Self-contained, confined packages from the Snap Store that update automatically and keep previous revisions; mounted read-only (squashfs) under `/snap`. |
+| **Syntax** | `snap list` · `snap info NAME` · `snap install NAME` · `snap refresh [--list]` · `snap revert NAME` · `snap remove NAME` · `snap changes` |
+| **Parameters** | `--channel=stable` · `refresh --hold=24h` · `list --all` (old revisions) |
+| **Example** | `snap list` · `sudo snap revert firefox` |
+| **Expected output** | `Name Version Rev Tracking Publisher Notes` / `firefox 132.0 5187 latest/stable mozilla✓ -` (example) |
+| **Equivalent** | `winget` / Microsoft Store apps (`Get-AppxPackage`) |
+| **Common errors** | Disk alerts on `/snap/*` squashfs mounts · expecting `apt` to manage snaps |
+| **Use case** | Rolling back a snap after a broken automatic refresh. |
+| **Docs** | <https://snapcraft.io/docs> |
+
+### dnf / rpm (RHEL family)
+
+| Field | Detail |
+|---|---|
+| **OS** | RHEL 8/9, Rocky, AlmaLinux, Fedora (`yum` on RHEL 7) — **not Ubuntu** |
+| **Description** | `dnf` resolves dependencies from repositories, keeps a transaction history with undo; `rpm` queries and verifies the installed-package database. |
+| **Syntax** | `dnf check-update` · `dnf upgrade` · <code>dnf install &#124; remove PKG</code> · `dnf info PKG` · `dnf provides PATH` · `dnf history [undo N]` · <code>rpm -qa &#124; -qi PKG &#124; -ql PKG &#124; -qf PATH &#124; -V PKG</code> |
+| **Parameters** | `check-update` exits **100** when updates exist · `--security` (with update info) |
+| **Example** | `rpm -qf /usr/sbin/sshd` |
+| **Expected output** | `openssh-server-8.7p1-38.el9.x86_64` (example) |
+| **Equivalent** | `apt list --upgradable`, `dpkg -S`, `dpkg -L` · `winget` |
+| **Common errors** | Treating exit code 100 from `check-update` as a failure in scripts |
+| **Use case** | Patching a mixed Ubuntu/RHEL estate with the same process. |
+| **Docs** | <https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/index> |

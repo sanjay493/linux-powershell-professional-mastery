@@ -41,9 +41,9 @@ days:
   - {day: 7, module: module-2, release: 2026-11-10, status: published, title: "File Permissions and Access Control"}
   - {day: 8, module: module-2, release: 2026-11-10, status: published, title: "Processes and Services",
      extras: ["scripts/linux/process-monitor.sh", "scripts/powershell/Process-Monitor.ps1"]}
-  - {day: 9, module: module-2, release: 2026-11-11, status: planned, title: "Disk and Storage Management",
+  - {day: 9, module: module-2, release: 2026-11-11, status: published, title: "Disk and Storage Management",
      extras: ["scripts/linux/disk-monitor.sh", "scripts/powershell/Disk-Monitor.ps1"]}
-  - {day: 10, module: module-2, release: 2026-11-11, status: planned, title: "Software and Package Management",
+  - {day: 10, module: module-2, release: 2026-11-11, status: published, title: "Software and Package Management",
      extras: ["docs/assessments/module-2-test.md"]}
   - {day: 11, module: module-3, release: 2026-11-12, status: planned, title: "IP Configuration"}
   - {day: 12, module: module-3, release: 2026-11-12, status: planned, title: "Connectivity Troubleshooting"}

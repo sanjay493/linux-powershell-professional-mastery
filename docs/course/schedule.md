@@ -12,7 +12,7 @@ New lessons, labs and their supporting materials are published **every night at 
 | 2026-11-08 22:00 | 03, 04 | Labs 03–04, reading/redirection and searching references | :material-check-circle: Published |
 | 2026-11-09 22:00 | 05, 06 | Labs 05–06, **Module 1 test**, help/history/pipelines and users/groups references | :material-check-circle: Published |
 | 2026-11-10 22:00 | 07, 08 | Labs 07–08, `process-monitor` scripts, permissions and processes/services references | :material-check-circle: Published |
-| 2026-11-11 22:00 | 09, 10 | Labs 09–10, `disk-monitor` scripts, **Module 2 test** | Scheduled |
+| 2026-11-11 22:00 | 09, 10 | Labs 09–10, `disk-monitor` scripts, **Module 2 test**, storage and packages references | :material-check-circle: Published |
 | 2026-11-12 22:00 | 11, 12 | Labs 11–12 | Scheduled |
 | 2026-11-13 22:00 | 13, 14 | Labs 13–14, `dns-check` and `port-monitor` scripts | Scheduled |
 | 2026-11-14 22:00 | 15, 16 | Labs 15–16, `network-diagnostic` and `log-analyser` scripts, **Module 3 test**, Networking guide PDF | Scheduled |

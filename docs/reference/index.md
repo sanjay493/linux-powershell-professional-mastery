@@ -56,8 +56,8 @@ A searchable reference for every command taught in the course. Use the **search 
 | Users & groups | :material-check: | :material-check: | Day 6 |
 | Permissions | :material-check: | :material-check: | Day 7 |
 | Processes & services | :material-check: | :material-check: | Day 8 |
-| Storage | Day 9 | Day 9 | |
-| Packages | Day 10 | Day 10 | |
+| Storage | :material-check: | :material-check: | Day 9 |
+| Packages | :material-check: | :material-check: | Day 10 |
 | Networking, DNS | Days 11–15 | Days 11–15 | |
 | Logs, security, firewall | Days 16–20 | Days 16–20 | |
 | Scripting & automation | Days 21–25 | Days 21–25 | |

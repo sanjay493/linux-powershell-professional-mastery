@@ -19,8 +19,8 @@ Every day has a dedicated lab. Each lab includes a **Lab ID, objective, required
 | [LAB-06](lab-06.md) | Onboard & Offboard | 06 | Create, modify, lock and audit lab users | Published |
 | [LAB-07](lab-07.md) | Lock It Down | 07 | Fix an over-permissive shared folder (with backup) | Published |
 | [LAB-08](lab-08.md) | Runaway Process | 08 | Identify a high-CPU process and an inactive service | Published |
-| LAB-09 | Disk Full | 09 | Find what is consuming disk space | 2026-11-11 |
-| LAB-10 | Software Inventory | 10 | Inventory, install and update packages safely | 2026-11-11 |
+| [LAB-09](lab-09.md) | Disk Full | 09 | Confirm a 95% alert, release space held by a deleted log, fix inode exhaustion, verify a UUID + nofail fstab entry | Published |
+| [LAB-10](lab-10.md) | Software Inventory | 10 | Inventory and patch status, inspect-simulate-install, remove vs purge, holds/pins, baseline export | Published |
 | LAB-11 – LAB-15 | Networking labs | 11–15 | IP, connectivity, DNS failure, port 443 owner, packet capture | 2026-11-12 → 14 |
 | LAB-16 – LAB-20 | Security labs | 16–20 | Logs, failed logins, firewall, baseline audit, suspicious connections | 2026-11-14 → 16 |
 | LAB-21 – LAB-25 | Automation labs | 21–25 | Scripts, loops, functions, reports, scheduled health checks | 2026-11-17 → 19 |

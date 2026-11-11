@@ -1362,4 +1362,4 @@ Start-Job { Start-Sleep 60 } ; Get-Job ; Stop-Job -Id 1 ; Remove-Job -Id 1
 
 ---
 
-**Previous:** [Day 07: File Permissions and Access Control](day-07.md) · **Next:** Day 09: Disk and Storage Management (see the [release schedule](../schedule.md))
+**Previous:** [Day 07: File Permissions and Access Control](day-07.md) · **Next:** [Day 09: Disk and Storage Management](day-09.md)
