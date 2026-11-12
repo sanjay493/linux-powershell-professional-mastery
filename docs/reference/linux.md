@@ -1087,3 +1087,157 @@ Platform: **Ubuntu 24.04 LTS**, Bash 5.2, GNU coreutils 9.4. Commands marked *GN
 | **Common errors** | Treating exit code 100 from `check-update` as a failure in scripts |
 | **Use case** | Patching a mixed Ubuntu/RHEL estate with the same process. |
 | **Docs** | <https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/managing_software_with_the_dnf_tool/index> |
+
+## Networking
+
+IP configuration (Day 11) and connectivity testing (Day 12). `ip` comes from **iproute2** (always installed). `traceroute` and `mtr-tiny` may need `sudo apt install traceroute mtr-tiny`. `ifconfig`, `route`, `arp` and `netstat` (net-tools) are obsolete and not installed by default on Ubuntu 24.04.
+
+### ip addr
+
+| Field | Detail |
+|---|---|
+| **OS** | All modern Linux (iproute2) |
+| **Description** | Shows, adds and removes IP addresses per interface, with prefix, scope, `dynamic` (DHCP/SLAAC) flag and lifetimes. Changes are **runtime only**. |
+| **Syntax** | <code>ip [-4 &#124; -6] [-br] [-o] [-j] addr show [dev IFACE]</code> · `ip addr add ADDR/PREFIX dev IFACE` · `ip addr del ADDR/PREFIX dev IFACE` |
+| **Parameters** | `-br` one line per interface · `-o` one line per address · `-j` JSON · `-4`/`-6` family · `secondary`, `dynamic`, `valid_lft` in output |
+| **Example** | `ip -br addr` · `sudo ip addr add 192.168.56.21/24 dev enp0s8` |
+| **Expected output** | `eth0@if7  UP  192.168.50.10/24` (captured) |
+| **Equivalent** | `Get-NetIPAddress` · `ipconfig` |
+| **Common errors** | Forgetting `/PREFIX` (address becomes `/32`) · `Error: ipv4: Address already assigned.` · expecting the change to survive a reboot |
+| **Use case** | First command of every network ticket: which addresses does this host really have? |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ip-address.8.html> |
+
+### ip link
+
+| Field | Detail |
+|---|---|
+| **OS** | All modern Linux (iproute2) |
+| **Description** | Interface names, state (`UP`, `LOWER_UP` = carrier), MAC, MTU; with `-s` counters (errors, drops); with `-d` driver/VLAN details. Can set links up/down and change the MTU (runtime). |
+| **Syntax** | `ip [-br] [-s] [-d] link show [dev IFACE]` · <code>ip link set dev IFACE up&#124;down&#124;mtu N</code> |
+| **Parameters** | `-br` brief · `-s` statistics · `-d` details · `mtu N` |
+| **Example** | `ip -s link show dev enp0s3` |
+| **Expected output** | `RX: bytes packets errors dropped missed mcast` / `378 5 0 0 0 0` (captured) |
+| **Equivalent** | `Get-NetAdapter` · `Get-NetAdapterStatistics` |
+| **Common errors** | Running `ip link set ... down` on the interface you are connected through (lockout) |
+| **Use case** | Separating cabling/driver problems (errors, no carrier) from IP problems. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ip-link.8.html> |
+
+### ip route / ip route get
+
+| Field | Detail |
+|---|---|
+| **OS** | All modern Linux (iproute2) |
+| **Description** | Shows and changes the routing table (`default via GW`, connected routes `proto kernel`, metrics); `ip route get ADDR` prints the kernel's decision: next hop, interface and source address. |
+| **Syntax** | `ip [-6] route [show [table T]]` · `ip route get ADDR` · <code>ip route add &#124; replace &#124; del PREFIX via GW [dev IFACE] [metric N]</code> |
+| **Parameters** | `via` next hop · `dev` interface · `metric` preference · `replace` add-or-overwrite · `table local` local/broadcast entries |
+| **Example** | `ip route get 10.20.0.20` · `sudo ip route replace default via 192.168.50.1` |
+| **Expected output** | `10.20.0.20 via 192.168.50.1 dev eth0 src 192.168.50.10 uid 1000` (format captured) |
+| **Equivalent** | `Get-NetRoute` · `Find-NetRoute -RemoteIPAddress` · `route print` |
+| **Common errors** | `Error: Nexthop has invalid gateway.` (gateway not on a connected subnet) · `RTNETLINK answers: Network is unreachable` (no route) · `RTNETLINK answers: File exists` (use `replace`) |
+| **Use case** | Proving which interface and source address a VPN-connected laptop uses for a destination. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ip-route.8.html> |
+
+### ip neigh
+
+| Field | Detail |
+|---|---|
+| **OS** | All modern Linux (iproute2) |
+| **Description** | ARP (IPv4) / neighbour discovery (IPv6) cache: IP → MAC with state `REACHABLE`, `STALE`, `DELAY`, `INCOMPLETE`, `FAILED`, `PERMANENT`. |
+| **Syntax** | <code>ip [-4 &#124; -6] neigh show [dev IFACE] [ADDR]</code> · `ip neigh flush dev IFACE` |
+| **Parameters** | `show ADDR` one entry · `flush` clear dynamic entries (root) |
+| **Example** | `ip neigh show 192.168.50.1` |
+| **Expected output** | `192.168.50.1 dev eth0 lladdr 4e:48:a5:bb:48:6e REACHABLE` (captured) |
+| **Equivalent** | `Get-NetNeighbor` · `arp -a` |
+| **Common errors** | Ignoring `FAILED` for the gateway and debugging DNS instead |
+| **Use case** | Spotting a wrong gateway address, a wrong VLAN or ARP spoofing (gateway MAC changes). |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ip-neighbour.8.html> |
+
+### netplan
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu (netplan.io; 1.1 on 24.04) |
+| **Description** | Persistent network configuration from YAML in `/etc/netplan/*.yaml`, rendered for systemd-networkd (servers) or NetworkManager (desktops). |
+| **Syntax** | `netplan get [KEY]` · `netplan generate [--root-dir DIR]` · `netplan try [--timeout N]` · `netplan apply` · `netplan status` |
+| **Parameters** | `try` applies with automatic rollback (default 120 s) · `generate --root-dir` validates a file in a scratch tree |
+| **Example** | `sudo netplan generate && sudo netplan try` |
+| **Expected output** | `Error in network definition: address '192.168.56.20' is missing /prefixlength` for a bad file (captured) |
+| **Equivalent** | `New-NetIPAddress` / `Set-NetIPInterface` (persistent store) |
+| **Common errors** | Tabs/uneven indentation · missing prefix · deprecated `gateway4:` · `Permissions ... are too open` (use mode 600) · `apply` over SSH without `try` |
+| **Use case** | Giving a new server its static address so that it survives reboots. |
+| **Docs** | <https://netplan.readthedocs.io/en/stable/> · <https://documentation.ubuntu.com/server/explanation/networking/about-netplan/> |
+
+### nmcli / networkctl
+
+| Field | Detail |
+|---|---|
+| **OS** | `nmcli`: Ubuntu Desktop (NetworkManager) · `networkctl`: Ubuntu Server (systemd-networkd) |
+| **Description** | Show and control the network service that owns an interface: devices, connection profiles, DHCP renew. |
+| **Syntax** | `nmcli device status` · `nmcli connection show` · `nmcli connection modify ID ipv4.method manual ipv4.addresses A/P ipv4.gateway G` · `networkctl status [IFACE]` · `networkctl renew IFACE` |
+| **Parameters** | `-f IP4` fields (nmcli) · `renew` new DHCP lease (networkctl) |
+| **Example** | `nmcli -f IP4 device show enp0s3` |
+| **Expected output** | `IP4.ADDRESS[1]: 10.0.2.15/24` / `IP4.GATEWAY: 10.0.2.2` (example) |
+| **Equivalent** | `Get-NetIPConfiguration` · `ipconfig /renew` |
+| **Common errors** | Using netplan on a desktop device managed by NetworkManager (or nmcli on a server) |
+| **Use case** | Renewing a laptop's DHCP lease without rebooting. |
+| **Docs** | <https://networkmanager.dev/docs/api/latest/nmcli.html> · <https://man7.org/linux/man-pages/man1/networkctl.1.html> |
+
+### ping
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (iputils-ping 20240117 on 24.04; not setuid, uses `cap_net_raw`) |
+| **Description** | Sends ICMP echo requests; reports replies, TTL, RTT, loss and `mdev` jitter. Exit status 0 = reply received, 1 = no reply, 2 = other error. |
+| **Syntax** | <code>ping [-c N] [-i SEC] [-W SEC] [-w SEC] [-s BYTES] [-M do&#124;want&#124;dont] [-t TTL] [-I IFACE&#124;ADDR] [-4&#124;-6] [-q] HOST</code> |
+| **Parameters** | `-c` count · `-W` per-reply timeout · `-w` deadline · `-M do -s 1472` MTU test · `-t 1` first router · `-q` summary |
+| **Example** | `ping -c1 -W1 -q 10.20.0.20 >/dev/null && echo up` |
+| **Expected output** | `64 bytes from 10.20.0.20: icmp_seq=1 ttl=63 time=0.045 ms` (captured) |
+| **Equivalent** | `Test-Connection` · `ping.exe` |
+| **Common errors** | No `-c` in scripts (never ends) · declaring a host down because ICMP is filtered · `Temporary failure in name resolution` is DNS (exit 2) |
+| **Use case** | Gateway and end-to-end reachability check at the start of a ticket. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ping.8.html> |
+
+### traceroute / tracepath
+
+| Field | Detail |
+|---|---|
+| **OS** | `traceroute` 2.1.5 (package traceroute) · `tracepath` (iputils-tracepath) |
+| **Description** | List the routers on the path using increasing TTLs. `traceroute` uses UDP by default (`-I` ICMP, `-T` TCP SYN, both usually need root); `tracepath` needs no root and reports the **path MTU**. |
+| **Syntax** | <code>traceroute [-n] [-I&#124;-T&#124;-U] [-p PORT] [-q N] [-w SEC] [-m MAX] HOST</code> · `tracepath [-n] [-m MAX] HOST` |
+| **Parameters** | `-n` numeric · `-T -p 443` TCP to the service port · `-q 1` one probe per hop · annotations `!H !N !X !F` |
+| **Example** | `sudo traceroute -n -T -p 443 HOST` · `tracepath -n HOST` |
+| **Expected output** | `Resume: pmtu 1400 hops 2 back 2` (captured) |
+| **Equivalent** | `tracert` · `Test-Connection -Traceroute` (7) · `Test-NetConnection -TraceRoute` |
+| **Common errors** | Treating `* * *` on an intermediate hop as an outage · *You do not have enough privileges to use this traceroute method* (use sudo) |
+| **Use case** | Showing where a path stops or where the MTU drops. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/traceroute.db.8.html> · <https://man7.org/linux/man-pages/man8/tracepath.8.html> |
+
+### mtr
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux (mtr-tiny on servers, mtr on desktops; 0.95 on 24.04) |
+| **Description** | Continuous traceroute with per-hop loss, latency and deviation; report mode gives static text for tickets. |
+| **Syntax** | <code>mtr [-r&#124;--report] [-w] [-c N] [-n] [-b] [-T&#124;-u] [-P PORT] HOST</code> |
+| **Parameters** | `-r -c 100` report with 100 cycles · `-n` numeric · `-T -P 443` TCP · `-w` wide · `-z` AS numbers |
+| **Example** | `mtr -rn -c 100 HOST` |
+| **Expected output** | <code>2.&#124;-- 10.20.0.20  22.0%  50  0.1  0.1  0.1  0.1  0.0</code> (captured, induced loss) |
+| **Equivalent** | `pathping` |
+| **Common errors** | Escalating loss that appears only at an intermediate hop (rate limiting) |
+| **Use case** | Evidence for an ISP escalation. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/mtr.8.html> |
+
+### nc -zv / curl (connection tests)
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu (netcat-openbsd and curl installed by default) |
+| **Description** | `nc -zv` tests whether a TCP port accepts connections (succeeded / refused / timed out). `curl -v` tests the application (DNS, connect, TLS, HTTP); `-w` prints per-phase timings. |
+| **Syntax** | `nc -zv [-w SEC] [-u] HOST PORT` · `curl [-v] [-I] [-sS] [-o FILE] [--connect-timeout SEC] [-m SEC] [-w FORMAT] URL` |
+| **Parameters** | `-z` connect only · `-w` timeout (nc) · `%{time_connect}`, `%{time_starttransfer}`, `%{http_code}` (curl) |
+| **Example** | `nc -zv -w2 10.20.0.20 8080` |
+| **Expected output** | `Connection to 10.20.0.20 8080 port [tcp/http-alt] succeeded!` · `nc: connect to 10.20.0.20 port 8443 (tcp) failed: Connection refused` (captured) |
+| **Equivalent** | `Test-NetConnection -Port` · `Test-Connection -TcpPort` (7) · `Invoke-WebRequest` / `curl.exe` |
+| **Common errors** | Trusting UDP "success" (`-u`) · confusing refused (nothing listening) with timed out (filtered) |
+| **Use case** | Proving that the path works and the problem is the service (refused) or a firewall (timeout). |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/nc_openbsd.1.html> · <https://curl.se/docs/manpage.html> |

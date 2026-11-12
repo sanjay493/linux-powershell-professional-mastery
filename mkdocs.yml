@@ -146,6 +146,8 @@ nav:
       - "Module 3: Networking & Troubleshooting":
           - course/module-3/index.md
           # >>> DAYS module-3
+          - "Day 11: IP Configuration": course/module-3/day-11.md
+          - "Day 12: Connectivity Troubleshooting": course/module-3/day-12.md
           # <<< DAYS module-3
       - "Module 4: Security, Logs & Monitoring":
           - course/module-4/index.md
@@ -177,6 +179,8 @@ nav:
       - "Lab 08: Runaway Process": labs/lab-08.md
       - "Lab 09: Disk Full": labs/lab-09.md
       - "Lab 10: Software Inventory": labs/lab-10.md
+      - "Lab 11: Address Audit": labs/lab-11.md
+      - "Lab 12: Can't Reach the Server": labs/lab-12.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md

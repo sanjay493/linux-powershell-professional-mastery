@@ -1087,3 +1087,172 @@ All `*-Local*` cmdlets are in the **`Microsoft.PowerShell.LocalAccounts`** modul
 | **Common errors** | `Unable to resolve package source` (enable TLS 1.2 in 5.1, update PowerShellGet) · *Administrator rights are required* with `AllUsers` |
 | **Use case** | Installing PSScriptAnalyzer for script linting (Days 21–25). |
 | **Docs** | <https://learn.microsoft.com/en-us/powershell/module/powershellget/install-module> |
+
+## Networking
+
+IP configuration (Day 11) and connectivity testing (Day 12). The `Net*` cmdlets come from the **NetTCPIP**, **NetAdapter** and **NetConnection** modules: **Windows only** (Windows 8 / Server 2012+), available in both 5.1 and 7 on Windows. Changing addresses, routes or adapters requires an elevated session. `Test-Connection` differs between 5.1 and 7 (see its entry). Cross-platform alternatives: `[System.Net.NetworkInformation.NetworkInterface]` and `[System.Net.Sockets.TcpClient]`.
+
+### Get-NetIPConfiguration
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetTCPIP). Alias: `gip` |
+| **Description** | One object per interface with `InterfaceAlias`, `InterfaceIndex`, `NetProfile`, `IPv4Address`, `IPv6Address`, `IPv4DefaultGateway`, `IPv6DefaultGateway` and `DNSServer`. |
+| **Syntax** | `Get-NetIPConfiguration [[-InterfaceAlias] <String>] [-InterfaceIndex <Int32>] [-All] [-Detailed]` |
+| **Parameters** | `-Detailed` adds MTU, MAC, DHCP and profile category · `-All` includes disconnected adapters |
+| **Example** | `(Get-NetIPConfiguration -InterfaceAlias Ethernet).IPv4DefaultGateway.NextHop` |
+| **Expected output** | `IPv4Address : 192.168.56.30` / `IPv4DefaultGateway : 192.168.56.1` (example) |
+| **Equivalent** | `ip -br addr` + `ip route` · `ipconfig /all` |
+| **Common errors** | *The term 'Get-NetIPConfiguration' is not recognized* on PowerShell 7 for Linux/macOS |
+| **Use case** | Help-desk summary of a PC's address, gateway and DNS in one command. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netipconfiguration> |
+
+### Get-NetIPAddress
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetTCPIP) |
+| **Description** | Every IP address with `PrefixLength`, `PrefixOrigin` (`Dhcp`, `Manual`, `WellKnown`, `RouterAdvertisement`), `SuffixOrigin`, `AddressState` (`Preferred`, `Tentative`, `Duplicate`…), lifetimes and `PolicyStore`. |
+| **Syntax** | <code>Get-NetIPAddress [[-IPAddress] &lt;String[]&gt;] [-InterfaceAlias &lt;String[]&gt;] [-AddressFamily &lt;IPv4&#124;IPv6&gt;] [-PrefixOrigin &lt;…&gt;] [-AddressState &lt;…&gt;] [-PolicyStore &lt;String&gt;]</code> |
+| **Parameters** | `-AddressFamily IPv4` · `-AddressState Duplicate` (conflicts) · `-PrefixOrigin WellKnown` (APIPA `169.254.*`) |
+| **Example** | <code>Get-NetIPAddress -AddressFamily IPv4 &#124; Select-Object InterfaceAlias, IPAddress, PrefixLength, PrefixOrigin &#124; Export-Csv ip.csv -NoTypeInformation</code> |
+| **Expected output** | `192.168.56.30  24  Dhcp  Dhcp  Preferred  23:41:07` (example) |
+| **Equivalent** | `ip addr` (`dynamic`, `valid_lft`) |
+| **Common errors** | Treating `169.254.x.x` as a working address |
+| **Use case** | Finding all PCs that fell back to APIPA after a DHCP outage. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netipaddress> |
+
+### New-NetIPAddress / Remove-NetIPAddress / Set-NetIPInterface
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** · **elevated** · support `-WhatIf` / `-Confirm` |
+| **Description** | Add or remove static addresses (optionally with the default gateway); `Set-NetIPInterface` enables/disables DHCP, sets MTU (`-NlMtuBytes`) and interface metric. Default policy store: active **and** persistent. |
+| **Syntax** | `New-NetIPAddress -InterfaceAlias <String> -IPAddress <String> -PrefixLength <Byte> [-DefaultGateway <String>] [-PolicyStore ActiveStore]` · <code>Set-NetIPInterface -InterfaceAlias &lt;String&gt; -AddressFamily IPv4 [-Dhcp Enabled&#124;Disabled] [-InterfaceMetric &lt;UInt32&gt;]</code> |
+| **Parameters** | `-PolicyStore ActiveStore` runtime only · `-DefaultGateway` also creates `0.0.0.0/0` · `-Dhcp Enabled` back to DHCP |
+| **Example** | `New-NetIPAddress -InterfaceAlias 'Ethernet 2' -IPAddress 192.168.56.20 -PrefixLength 24 -DefaultGateway 192.168.56.1 -WhatIf` |
+| **Expected output** | `What if: Performing the operation "Create" on target "IPAddress: 192.168.56.20 PrefixLength 24 ..."` (example) |
+| **Equivalent** | `ip addr add` (runtime) · netplan YAML (persistent) |
+| **Common errors** | *Inconsistent parameters PolicyStore PersistentStore and Dhcp Enabled* (disable DHCP first) · *Instance DefaultGateway already exists* (remove the old route) · running it on the adapter of your remote session |
+| **Use case** | Scripted static configuration of a new Windows server. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/new-netipaddress> · <https://learn.microsoft.com/en-us/powershell/module/nettcpip/set-netipinterface> |
+
+### Get-NetAdapter / Get-NetIPInterface
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetAdapter / NetTCPIP) |
+| **Description** | `Get-NetAdapter`: name, description, `ifIndex`, `Status` (`Up`, `Disconnected`, `Disabled`), `MacAddress`, `LinkSpeed`. `Get-NetIPInterface`: per-family `Dhcp`, `NlMtu`, `InterfaceMetric`, `ConnectionState`, `Forwarding`. |
+| **Syntax** | `Get-NetAdapter [[-Name] <String[]>] [-Physical]` · <code>Get-NetIPInterface [[-InterfaceAlias] &lt;String[]&gt;] [-AddressFamily &lt;IPv4&#124;IPv6&gt;]</code> |
+| **Parameters** | `-Physical` hides virtual adapters · `Get-NetAdapterStatistics` for counters |
+| **Example** | <code>Get-NetIPInterface -AddressFamily IPv4 &#124; Format-Table InterfaceAlias, Dhcp, NlMtu, InterfaceMetric</code> |
+| **Expected output** | `Ethernet  Enabled  1500  25` (example) |
+| **Equivalent** | `ip -br link` · `ip link show` (MTU) · `ip route` (metrics) |
+| **Common errors** | Expecting the MTU in `Get-NetAdapter` (it is `NlMtu` on the IP interface) |
+| **Use case** | Explaining why Windows prefers Wi-Fi over Ethernet (metric). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netadapter/get-netadapter> · <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netipinterface> |
+
+### Get-NetRoute / Find-NetRoute
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetTCPIP) |
+| **Description** | `Get-NetRoute` lists `DestinationPrefix`, `NextHop`, `RouteMetric`, `InterfaceAlias`; `Find-NetRoute -RemoteIPAddress` returns the source address and the route Windows would use. |
+| **Syntax** | <code>Get-NetRoute [-DestinationPrefix &lt;String[]&gt;] [-AddressFamily &lt;IPv4&#124;IPv6&gt;] [-InterfaceAlias &lt;String[]&gt;]</code> · `Find-NetRoute -RemoteIPAddress <String>` · `New-NetRoute -DestinationPrefix <String> -NextHop <String> -InterfaceAlias <String>` |
+| **Parameters** | `-DestinationPrefix 0.0.0.0/0` default route · `NextHop 0.0.0.0` = on-link |
+| **Example** | <code>Find-NetRoute -RemoteIPAddress 10.20.0.20 &#124; Select-Object IPAddress, InterfaceAlias, DestinationPrefix, NextHop</code> |
+| **Expected output** | `192.168.56.30  Ethernet` / `Ethernet  0.0.0.0/0  192.168.56.1` (example) |
+| **Equivalent** | `ip route` · `ip route get` · `route print` |
+| **Common errors** | Forgetting that the effective metric is route metric **plus** interface metric |
+| **Use case** | Showing that a VPN's more specific route captures traffic to a home subnet. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netroute> · <https://learn.microsoft.com/en-us/powershell/module/nettcpip/find-netroute> |
+
+### Get-NetNeighbor
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetTCPIP) |
+| **Description** | ARP / neighbour cache: `IPAddress`, `LinkLayerAddress` (MAC), `State` (`Reachable`, `Stale`, `Permanent`, `Incomplete`, `Unreachable`). |
+| **Syntax** | <code>Get-NetNeighbor [[-IPAddress] &lt;String[]&gt;] [-InterfaceAlias &lt;String[]&gt;] [-AddressFamily &lt;IPv4&#124;IPv6&gt;] [-State &lt;…&gt;]</code> |
+| **Parameters** | `-IPAddress GW` gateway only · `-State Unreachable` |
+| **Example** | `Get-NetNeighbor -IPAddress 192.168.56.1` |
+| **Expected output** | `12  192.168.56.1  52-54-00-12-35-02  Reachable  ActiveStore` (example) |
+| **Equivalent** | `ip neigh` · `arp -a` |
+| **Common errors** | Debugging DNS while the gateway entry is `Unreachable` |
+| **Use case** | Confirming layer-2 reachability of the default gateway. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netneighbor> |
+
+### ipconfig / route print / arp (native)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (any shell) |
+| **Description** | Classic tools: `ipconfig /all` (addresses, DHCP lease, DNS, MAC, APIPA), `/release` and `/renew` (DHCP), `route print` (routing table, persistent routes), `arp -a` (ARP cache). |
+| **Syntax** | <code>ipconfig [/all &#124; /release [ADAPTER] &#124; /renew [ADAPTER] &#124; /release6 &#124; /renew6]</code> · <code>route print [-4&#124;-6]</code> · `arp -a [-N IFADDR]` |
+| **Parameters** | `/all` full detail · `route -p add` persistent route |
+| **Example** | `ipconfig /renew "Wi-Fi"` |
+| **Expected output** | `Autoconfiguration IPv4 Address. . : 169.254.81.177(Preferred)` = DHCP failed (example) |
+| **Equivalent** | `ip addr`, `networkctl renew`, `ip route`, `ip neigh` |
+| **Common errors** | Parsing the localised text in scripts (use the cmdlets) |
+| **Use case** | Instructions for end users that work on every Windows version. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ipconfig> |
+
+### Test-Connection
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **5.1** (Windows, WMI `Win32_PingStatus`, `-ComputerName`) · **7.x** (all OS, .NET, `-TargetName` with `-ComputerName` alias) |
+| **Description** | ICMP ping returning objects; in 7.x also `-Traceroute`, `-MtuSize` and `-TcpPort`. `-Quiet` returns `$true`/`$false` in both. |
+| **Syntax** | 5.1: `Test-Connection [-ComputerName] <String[]> [-Count <Int32>] [-BufferSize <Int32>] [-TimeToLive <Int32>] [-Quiet]` · 7.x: `Test-Connection [-TargetName] <String[]> [-Count <Int32>] [-TimeoutSeconds <Int32>] [-BufferSize <Int32>] [-DontFragment] [-Quiet] [-Repeat]` · `-Traceroute` · `-MtuSize` · `-TcpPort <Int32>` |
+| **Parameters** | `-Count` (default 4) · `-Quiet` · 7.x: `-TcpPort`, `-Traceroute`, `-MtuSize`, `-TimeoutSeconds` (default 5) |
+| **Example** | `Test-Connection -TargetName 10.20.0.20 -TcpPort 8080` |
+| **Expected output** | `True` · ping table `1 vm 10.20.0.20 0 32 Success` (captured, PowerShell 7.4.6 on Linux) |
+| **Equivalent** | `ping` · `nc -zv` · `traceroute` · `tracepath` |
+| **Common errors** | *A parameter cannot be found that matches parameter name 'TcpPort'/'TargetName'* in 5.1 · non-terminating errors on failure in 5.1 (use `-Quiet`) |
+| **Use case** | Cross-platform reachability checks in scripts with a Boolean result. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/test-connection> |
+
+### Test-NetConnection
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetTCPIP). Alias: `tnc` |
+| **Description** | Ping plus TCP port test plus route information: `PingSucceeded`, `PingReplyDetails`, `TcpTestSucceeded`, `SourceAddress`, `InterfaceAlias`, and with `-InformationLevel Detailed` name resolution and next hop. |
+| **Syntax** | <code>Test-NetConnection [[-ComputerName] &lt;String&gt;] [-Port &lt;Int32&gt; &#124; -CommonTCPPort &lt;HTTP&#124;RDP&#124;SMB&#124;WINRM&gt;] [-TraceRoute [-Hops &lt;Int32&gt;]] [-InformationLevel &lt;Quiet&#124;Detailed&gt;]</code> |
+| **Parameters** | `-Port` · `-CommonTCPPort SMB` · `-InformationLevel Quiet` Boolean · `-TraceRoute` |
+| **Example** | `Test-NetConnection -ComputerName fileserver -CommonTCPPort SMB` |
+| **Expected output** | `TcpTestSucceeded : True` · `WARNING: TCP connect to (10.20.0.20 : 8443) failed` (example) |
+| **Equivalent** | `nc -zv` · `curl -v` · `ip route get` |
+| **Common errors** | ~20 s wait against a filtering firewall · ping warning although the port is open (ICMP blocked) · no target = tests a Microsoft internet beacon |
+| **Use case** | "Can this PC reach the file server on 445?" in one command. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/test-netconnection> |
+
+### ping.exe / tracert / pathping (native)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (any shell) |
+| **Description** | Classic ICMP tools: `ping` (`-n` count, `-t` continuous, `-l` size, `-f` DF, `-i` TTL, `-w` timeout ms), `tracert` (ICMP trace), `pathping` (trace + per-hop/per-link loss). |
+| **Syntax** | <code>ping [-n N &#124; -t] [-l SIZE] [-f] [-i TTL] [-w MS] [-S SRC] [-4&#124;-6] HOST</code> · `tracert [-d] [-h MAX] [-w MS] HOST` · `pathping [-n] [-q N] [-h MAX] HOST` |
+| **Parameters** | `-f -l 1472` MTU test · `-d` / `-n` numeric |
+| **Example** | `ping -f -l 1472 10.20.0.20` |
+| **Expected output** | `Packet needs to be fragmented but DF set.` (example) |
+| **Equivalent** | `ping -M do -s 1472` · `traceroute` · `mtr` |
+| **Common errors** | `Reply from <own IP>: Destination host unreachable.` counted as *Received* in the statistics · parsing localised text |
+| **Use case** | Per-link loss evidence (`pathping`) for a WAN provider. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ping> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/pathping> |
+
+### .NET NetworkInterface and TcpClient (cross-platform)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7.x · **all OS** |
+| **Description** | `[System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()` lists interfaces and addresses anywhere; `[System.Net.Sockets.TcpClient]` tests a TCP port with your own timeout and exact socket error. |
+| **Syntax** | `$nic.GetIPProperties().UnicastAddresses` · `$c = [System.Net.Sockets.TcpClient]::new(); $c.ConnectAsync(HOST, PORT).Wait(MS)` |
+| **Parameters** | `GetBaseException().SocketErrorCode` → `ConnectionRefused`, `TimedOut`, `HostUnreachable` |
+| **Example** | <code>[System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() &#124; Select-Object Name, OperationalStatus</code> |
+| **Expected output** | `lo Up 127.0.0.1 8` / `eth0 Up 192.0.2.2 24` (captured, PowerShell 7.4.6 on Linux) |
+| **Equivalent** | `ip -br addr` · `nc -zv -w2` |
+| **Common errors** | Reading `InnerException.Message` (an aggregate message) instead of `GetBaseException()` · always `Dispose()` the client |
+| **Use case** | Port checks in scripts that must also run on Linux. |
+| **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.net.networkinformation.networkinterface> · <https://learn.microsoft.com/en-us/dotnet/api/system.net.sockets.tcpclient> |

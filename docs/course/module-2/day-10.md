@@ -1286,4 +1286,4 @@ Get-FileHash file -Algorithm SHA256 ; Get-AuthenticodeSignature file
 
 ---
 
-**Previous:** [Day 09: Disk and Storage Management](day-09.md) · **Next:** Day 11: IP Configuration (see the [release schedule](../schedule.md))
+**Previous:** [Day 09: Disk and Storage Management](day-09.md) · **Next:** [Day 11: IP Configuration](../module-3/day-11.md)

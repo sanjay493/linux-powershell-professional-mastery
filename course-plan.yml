@@ -45,8 +45,8 @@ days:
      extras: ["scripts/linux/disk-monitor.sh", "scripts/powershell/Disk-Monitor.ps1"]}
   - {day: 10, module: module-2, release: 2026-11-11, status: published, title: "Software and Package Management",
      extras: ["docs/assessments/module-2-test.md"]}
-  - {day: 11, module: module-3, release: 2026-11-12, status: planned, title: "IP Configuration"}
-  - {day: 12, module: module-3, release: 2026-11-12, status: planned, title: "Connectivity Troubleshooting"}
+  - {day: 11, module: module-3, release: 2026-11-12, status: published, title: "IP Configuration"}
+  - {day: 12, module: module-3, release: 2026-11-12, status: published, title: "Connectivity Troubleshooting"}
   - {day: 13, module: module-3, release: 2026-11-13, status: planned, title: "DNS Troubleshooting",
      extras: ["scripts/linux/dns-check.sh", "scripts/powershell/DNS-Check.ps1"]}
   - {day: 14, module: module-3, release: 2026-11-13, status: planned, title: "Ports, Sockets and Connections",

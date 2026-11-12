@@ -238,3 +238,43 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | OS components | `apt install` | `Get-WindowsOptionalFeature` · `Get-WindowsCapability` | Elevated |
 | Shell modules | — | `Install-PSResource -Scope CurrentUser` · `Install-Module -Scope CurrentUser` | PSResourceGet built into 7.4+ |
 | RHEL family | `dnf check-update` (exit 100) · `rpm -qf` · `dnf history undo` | — | |
+
+## Networking: IP configuration
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Overview | `ip -br addr` · `ip -br link` | `Get-NetIPConfiguration` · `ipconfig` | `Net*` cmdlets are Windows-only |
+| Full detail | `ip addr` · `ip -d link` | `ipconfig /all` · `Get-NetIPConfiguration -Detailed` | |
+| Address origin / lease | `dynamic`, `valid_lft` in `ip addr` | `Get-NetIPAddress` (`PrefixOrigin`, `ValidLifetime`) | |
+| APIPA / duplicates | No IPv4 address shown | `Get-NetIPAddress -PrefixOrigin WellKnown` · `-AddressState Duplicate` | |
+| MAC, link speed | `ip link` · `ethtool IFACE` | `Get-NetAdapter` | |
+| Counters | `ip -s link` | `Get-NetAdapterStatistics` | |
+| MTU / metric / DHCP flag | `ip link` · `ip route` metrics | `Get-NetIPInterface` (`NlMtu`, `InterfaceMetric`, `Dhcp`) | |
+| Routing table | `ip route` · `ip -6 route` | `Get-NetRoute` · `route print` | |
+| Route for a destination | `ip route get ADDR` | `Find-NetRoute -RemoteIPAddress ADDR` | |
+| ARP / neighbours | `ip neigh` | `Get-NetNeighbor` · `arp -a` | |
+| Temporary address | `sudo ip addr add A/P dev IFACE` | `New-NetIPAddress … -PolicyStore ActiveStore` | Elevated |
+| Persistent static address | Netplan YAML + `sudo netplan try` | `New-NetIPAddress … -DefaultGateway GW` | |
+| Validate before applying | `sudo netplan generate` | `-WhatIf` | |
+| Back to DHCP | YAML `dhcp4: true` | `Set-NetIPInterface -Dhcp Enabled` | Remove static address/route first on Windows |
+| Renew DHCP | `sudo networkctl renew IFACE` · `nmcli con up ID` | `ipconfig /renew` | |
+| JSON / CSV export | `ip -j addr` | <code>Get-NetIPAddress &#124; Export-Csv</code> · `ConvertTo-Json` | |
+| Subnet maths | `ipcalc A/P` | .NET `IPAddress` + bit operations | |
+| Cross-platform | `ip` | `[System.Net.NetworkInformation.NetworkInterface]` | |
+
+## Networking: connectivity
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Ping N times | `ping -c 4 HOST` | `Test-Connection HOST -Count 4` · `ping -n 4 HOST` | Linux ping runs forever without `-c` |
+| Boolean check | `ping -c1 -W1 -q HOST >/dev/null` | `Test-Connection HOST -Count 1 -Quiet` | Exit codes 0/1/2 on Linux |
+| Timeout units | `-W` seconds | `ping -w` milliseconds · `-TimeoutSeconds` (7) | ⚠ |
+| TTL option | `ping -t N` | `ping -i N` · `-TimeToLive` (5.1) | ⚠ letters swapped |
+| Path MTU | `ping -M do -s 1472` · `tracepath -n` | `ping -f -l 1472` · `Test-Connection -MtuSize` (7) | Payload = MTU − 28 |
+| Trace | `traceroute -n` (UDP) · `sudo traceroute -n -I` | `tracert -d` (ICMP) · `Test-Connection -Traceroute` (7) | |
+| TCP trace | `sudo traceroute -T -p PORT` · `mtr -T -P PORT` | — | |
+| Per-hop loss | `mtr -rn -c 100` | `pathping -n` | Intermediate-hop loss alone is usually rate limiting |
+| TCP port | `nc -zv -w2 HOST PORT` | `Test-NetConnection HOST -Port PORT` · `Test-Connection HOST -TcpPort PORT` (7) | |
+| Exact socket error | `nc -zv` message | `TcpClient` + `GetBaseException().SocketErrorCode` | refused vs timed out |
+| HTTP test | `curl -v URL` · `curl -w` timings | `Invoke-WebRequest URL` · `curl.exe -v URL` | `curl` = `Invoke-WebRequest` alias in 5.1 ⚠ |
+| Is it routing? | `sysctl net.ipv4.ip_forward` | <code>Get-NetIPInterface &#124; Select-Object InterfaceAlias, Forwarding</code> | |

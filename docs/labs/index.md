@@ -21,7 +21,9 @@ Every day has a dedicated lab. Each lab includes a **Lab ID, objective, required
 | [LAB-08](lab-08.md) | Runaway Process | 08 | Identify a high-CPU process and an inactive service | Published |
 | [LAB-09](lab-09.md) | Disk Full | 09 | Confirm a 95% alert, release space held by a deleted log, fix inode exhaustion, verify a UUID + nofail fstab entry | Published |
 | [LAB-10](lab-10.md) | Software Inventory | 10 | Inventory and patch status, inspect-simulate-install, remove vs purge, holds/pins, baseline export | Published |
-| LAB-11 – LAB-15 | Networking labs | 11–15 | IP, connectivity, DNS failure, port 443 owner, packet capture | 2026-11-12 → 14 |
+| [LAB-11](lab-11.md) | Address Audit | 11 | Document IP configuration, check a subnet plan, repair a host with a wrong prefix and no default route, validate a netplan file | Published |
+| [LAB-12](lab-12.md) | Can't Reach the Server | 12 | Five layered faults (forwarding, return route, ICMP filter, dropped port, stopped service), path MTU and loss, open/refused/filtered ports | Published |
+| LAB-13 – LAB-15 | Networking labs | 13–15 | DNS failure, port 443 owner, packet capture | 2026-11-13 → 14 |
 | LAB-16 – LAB-20 | Security labs | 16–20 | Logs, failed logins, firewall, baseline audit, suspicious connections | 2026-11-14 → 16 |
 | LAB-21 – LAB-25 | Automation labs | 21–25 | Scripts, loops, functions, reports, scheduled health checks | 2026-11-17 → 19 |
 | LAB-26 – LAB-30 | Professional labs | 26–30 | Remote admin, investigations, RCA, diagnostics, capstone | 2026-11-19 → 21 |

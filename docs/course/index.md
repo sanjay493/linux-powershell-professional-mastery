@@ -33,8 +33,8 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 
 | Day | Lesson | Key commands |
 |---|---|---|
-| 11 | IP Configuration | `ip addr` `ip route` · `Get-NetIPConfiguration` `Get-NetIPAddress` `Get-NetRoute` |
-| 12 | Connectivity Troubleshooting | `ping` `traceroute` `tracepath` `mtr` · `Test-Connection` `Test-NetConnection` `tracert` |
+| 11 | [IP Configuration](module-3/day-11.md) | `ip addr` `ip route` · `Get-NetIPConfiguration` `Get-NetIPAddress` `Get-NetRoute` |
+| 12 | [Connectivity Troubleshooting](module-3/day-12.md) | `ping` `traceroute` `tracepath` `mtr` · `Test-Connection` `Test-NetConnection` `tracert` |
 | 13 | DNS Troubleshooting | `dig` `nslookup` `host` · `Resolve-DnsName` |
 | 14 | Ports, Sockets and Connections | `ss` `netstat` `lsof` · `Get-NetTCPConnection` `Get-NetUDPEndpoint` |
 | 15 | Network Interfaces and Diagnostics | `ip link` `ip neigh` `tcpdump` · `Get-NetAdapter` `Get-NetNeighbor` `pktmon` · Wireshark |

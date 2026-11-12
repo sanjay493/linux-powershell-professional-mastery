@@ -20,6 +20,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 08 | [Processes and Services](../course/module-2/day-08.md#quiz) |
 | 09 | [Disk and Storage Management](../course/module-2/day-09.md#quiz) |
 | 10 | [Software and Package Management](../course/module-2/day-10.md#quiz) |
+| 11 | [IP Configuration](../course/module-3/day-11.md#quiz) |
+| 12 | [Connectivity Troubleshooting](../course/module-3/day-12.md#quiz) |
 
 ## Module tests
 

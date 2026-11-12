@@ -6,6 +6,14 @@ description: "Release history of the course."
 
 All notable changes are listed here, newest first. Nightly releases add two days each.
 
+## 2026-11-12 — v0.6.0 (nightly release: Days 11–12, Module 3 begins)
+
+- **Day 11** IP Configuration (address, prefix, gateway and DNS; subnet maths and special ranges incl. RFC 1918, CGNAT, APIPA and IPv6 address types; MAC/ARP and the neighbour cache; routing tables and longest-prefix match; MTU; DHCP vs static; runtime vs persistent configuration; `ip addr`/`link`/`route`/`neigh`, `ip route get`, `-br`/`-o`/`-j`, `ipcalc`, netplan `get`/`generate`/`try`/`apply`, `nmcli`, `networkctl`; `Get-NetIPConfiguration`, `Get-NetIPAddress` (`PrefixOrigin`, `AddressState`), `Get-NetAdapter`, `Get-NetIPInterface`, `Get-NetRoute`, `Find-NetRoute`, `Get-NetNeighbor`, `New-NetIPAddress`/`Set-NetIPInterface` with `-WhatIf` and `-PolicyStore`, `ipconfig`, `route print`, the cross-platform .NET `NetworkInterface` class), with **Lab 11: Address Audit**.
+- **Day 12** Connectivity Troubleshooting (layered method; ICMP messages and who sends them; TTL and RTT; `ping` options and exit codes; `traceroute` UDP/ICMP/TCP, `tracepath` and path MTU, `mtr` reports and intermediate-hop rate limiting; refused vs timed out vs unreachable; return-path problems; `nc -zv`, `curl -w` timings; `Test-Connection` in 5.1 vs 7 (`-TcpPort`, `-Traceroute`, `-MtuSize`), `Test-NetConnection -Port`/`-TraceRoute`/`-InformationLevel`, `ping.exe`, `tracert`, `pathping`, `TcpClient` port tests), with **Lab 12: Can't Reach the Server**.
+- Both labs run in isolated Linux network namespaces (client/router/server), so faults can be practised without touching the real network.
+- Command reference: new **Networking** category for Linux and PowerShell, plus *Networking: IP configuration* and *Networking: connectivity* comparison tables.
+- Day 10 now links to Day 11; course, module, lab, schedule, assessment and reference indexes updated.
+
 ## 2026-11-11 — v0.5.0 (nightly release: Days 09–10, Module 2 complete)
 
 - **Day 09** Disk and Storage Management (the storage stack, MBR/GPT, ext4/XFS/Btrfs/NTFS/ReFS, `df` incl. `-i` and `--output`, `du -x`/`--apparent-size`, `lsblk`, `blkid`, `findmnt -T`/`--verify`, `mount`/`umount`/remount, `/etc/fstab` with `UUID=` and `nofail`, reserved blocks, inode exhaustion, deleted-but-open files with `lsof +L1`, practice loop devices, LVM `pvs`/`vgs`/`lvs`/`lvextend -r`, swap, `e2fsck -n`; `Get-PSDrive`, `Get-Volume`, `Get-Disk`, `Get-Partition`, `Get-PhysicalDisk`, `Win32_LogicalDisk`, `DriveInfo`, folder sizes with `Measure-Object`, VHDX practice disks, `Initialize-Disk`/`New-Partition`/`Format-Volume`, `Repair-Volume`, `chkdsk /scan`, WinSxS cleanup), with **Lab 09: Disk Full**.

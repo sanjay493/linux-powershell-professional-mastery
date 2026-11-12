@@ -19,8 +19,8 @@ You will read and interpret IP configuration, troubleshoot connectivity layer by
 
 | Day | Lesson | Lab | Status |
 |---|---|---|---|
-| 11 | IP Configuration | Lab 11 | 2026-11-12 22:00 IST |
-| 12 | Connectivity Troubleshooting | Lab 12 | 2026-11-12 22:00 IST |
+| 11 | [IP Configuration](day-11.md) | [Lab 11](../../labs/lab-11.md) | Published |
+| 12 | [Connectivity Troubleshooting](day-12.md) | [Lab 12](../../labs/lab-12.md) | Published |
 | 13 | DNS Troubleshooting | Lab 13 | 2026-11-13 22:00 IST |
 | 14 | Ports, Sockets and Connections | Lab 14 | 2026-11-13 22:00 IST |
 | 15 | Network Interfaces and Diagnostics | Lab 15 | 2026-11-14 22:00 IST |
