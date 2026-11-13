@@ -23,7 +23,9 @@ Every day has a dedicated lab. Each lab includes a **Lab ID, objective, required
 | [LAB-10](lab-10.md) | Software Inventory | 10 | Inventory and patch status, inspect-simulate-install, remove vs purge, holds/pins, baseline export | Published |
 | [LAB-11](lab-11.md) | Address Audit | 11 | Document IP configuration, check a subnet plan, repair a host with a wrong prefix and no default route, validate a netplan file | Published |
 | [LAB-12](lab-12.md) | Can't Reach the Server | 12 | Five layered faults (forwarding, return route, ICMP filter, dropped port, stopped service), path MTU and loss, open/refused/filtered ports | Published |
-| LAB-13 – LAB-15 | Networking labs | 13–15 | DNS failure, port 443 owner, packet capture | 2026-11-13 → 14 |
+| [LAB-13](lab-13.md) | Name Resolution Failure | 13 | Works by IP, not by name: wrong nameserver, stale hosts entry, missing record and negative caching, broken zone (SERVFAIL), firewalled resolver, missing PTR | Published |
+| [LAB-14](lab-14.md) | Who Owns Port 443? | 14 | Port owner behind "address already in use", exposure audit (0.0.0.0 vs 127.0.0.1), listening-port baseline and diff, suspicious listener and outbound beacon, CLOSE-WAIT and TIME-WAIT; Windows Get-NetTCPConnection, netstat -ano, Compare-Object | Published |
+| LAB-15 | Networking lab | 15 | Packet capture | 2026-11-14 |
 | LAB-16 – LAB-20 | Security labs | 16–20 | Logs, failed logins, firewall, baseline audit, suspicious connections | 2026-11-14 → 16 |
 | LAB-21 – LAB-25 | Automation labs | 21–25 | Scripts, loops, functions, reports, scheduled health checks | 2026-11-17 → 19 |
 | LAB-26 – LAB-30 | Professional labs | 26–30 | Remote admin, investigations, RCA, diagnostics, capstone | 2026-11-19 → 21 |

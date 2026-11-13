@@ -47,9 +47,9 @@ days:
      extras: ["docs/assessments/module-2-test.md"]}
   - {day: 11, module: module-3, release: 2026-11-12, status: published, title: "IP Configuration"}
   - {day: 12, module: module-3, release: 2026-11-12, status: published, title: "Connectivity Troubleshooting"}
-  - {day: 13, module: module-3, release: 2026-11-13, status: planned, title: "DNS Troubleshooting",
+  - {day: 13, module: module-3, release: 2026-11-13, status: published, title: "DNS Troubleshooting",
      extras: ["scripts/linux/dns-check.sh", "scripts/powershell/DNS-Check.ps1"]}
-  - {day: 14, module: module-3, release: 2026-11-13, status: planned, title: "Ports, Sockets and Connections",
+  - {day: 14, module: module-3, release: 2026-11-13, status: published, title: "Ports, Sockets and Connections",
      extras: ["scripts/linux/port-monitor.sh", "scripts/powershell/Port-Monitor.ps1"]}
   - {day: 15, module: module-3, release: 2026-11-14, status: planned, title: "Network Interfaces and Diagnostics",
      extras: ["scripts/linux/network-diagnostic.sh", "scripts/powershell/Network-Diagnostic.ps1",

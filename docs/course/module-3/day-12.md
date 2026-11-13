@@ -1295,4 +1295,4 @@ curl.exe -v URL ; Invoke-WebRequest URL -UseBasicParsing   # application test (-
 
 ---
 
-**Previous:** [Day 11: IP Configuration](day-11.md) · **Next:** Day 13: DNS Troubleshooting (see the [release schedule](../schedule.md))
+**Previous:** [Day 11: IP Configuration](day-11.md) · **Next:** [Day 13: DNS Troubleshooting](day-13.md)

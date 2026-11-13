@@ -21,8 +21,8 @@ You will read and interpret IP configuration, troubleshoot connectivity layer by
 |---|---|---|---|
 | 11 | [IP Configuration](day-11.md) | [Lab 11](../../labs/lab-11.md) | Published |
 | 12 | [Connectivity Troubleshooting](day-12.md) | [Lab 12](../../labs/lab-12.md) | Published |
-| 13 | DNS Troubleshooting | Lab 13 | 2026-11-13 22:00 IST |
-| 14 | Ports, Sockets and Connections | Lab 14 | 2026-11-13 22:00 IST |
+| 13 | [DNS Troubleshooting](day-13.md) | [Lab 13](../../labs/lab-13.md) | Published |
+| 14 | [Ports, Sockets and Connections](day-14.md) | [Lab 14](../../labs/lab-14.md) | Published |
 | 15 | Network Interfaces and Diagnostics | Lab 15 | 2026-11-14 22:00 IST |
 
 **Module test:** released with Day 15 in [Assessments](../../assessments/index.md).

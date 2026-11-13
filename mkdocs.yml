@@ -148,6 +148,8 @@ nav:
           # >>> DAYS module-3
           - "Day 11: IP Configuration": course/module-3/day-11.md
           - "Day 12: Connectivity Troubleshooting": course/module-3/day-12.md
+          - "Day 13: DNS Troubleshooting": course/module-3/day-13.md
+          - "Day 14: Ports, Sockets & Connections": course/module-3/day-14.md
           # <<< DAYS module-3
       - "Module 4: Security, Logs & Monitoring":
           - course/module-4/index.md
@@ -181,6 +183,8 @@ nav:
       - "Lab 10: Software Inventory": labs/lab-10.md
       - "Lab 11: Address Audit": labs/lab-11.md
       - "Lab 12: Can't Reach the Server": labs/lab-12.md
+      - "Lab 13: Name Resolution Failure": labs/lab-13.md
+      - "Lab 14: Who Owns Port 443?": labs/lab-14.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md

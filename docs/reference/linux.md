@@ -1241,3 +1241,187 @@ IP configuration (Day 11) and connectivity testing (Day 12). `ip` comes from **i
 | **Common errors** | Trusting UDP "success" (`-u`) · confusing refused (nothing listening) with timed out (filtered) |
 | **Use case** | Proving that the path works and the problem is the service (refused) or a firewall (timeout). |
 | **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/nc_openbsd.1.html> · <https://curl.se/docs/manpage.html> |
+
+## DNS
+
+### dig
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (package `bind9-dnsutils`; BIND 9.18 on Ubuntu 24.04) |
+| **Description** | Sends one DNS query and prints the full response: status, flags (`qr aa tc rd ra ad cd`), answer/authority/additional sections, server and query time. Ignores `/etc/hosts` and the `search` list (unless `+search`). |
+| **Syntax** | `dig [@SERVER] [-x ADDR] NAME [TYPE] [+short] [+noall +answer +comments +authority +stats] [+norecurse] [+trace] [+tcp] [+dnssec] [+search] [+timeout=SEC] [+tries=N]` |
+| **Parameters** | `@SERVER` · `TYPE` (A, AAAA, MX, NS, SOA, TXT, SRV, CAA, PTR) · `-x` reverse · `+short` · `+norecurse` (authority/cache test) · `+trace` · `+tcp` |
+| **Example** | `dig @192.168.13.54 www.corp.example +norecurse +noall +comments +answer` |
+| **Expected output** | `;; flags: qr aa; …` / `www.corp.example. 300 IN A 192.168.13.80` (captured, Lab 13) |
+| **Equivalent** | `Resolve-DnsName -Server … -DnsOnly` · `nslookup` |
+| **Common errors** | Treating exit code 0 as success (NXDOMAIN and SERVFAIL also exit 0; exit 9 = no reply) · `dig www` without `+search` · forgetting `dig` bypasses `/etc/hosts` |
+| **Use case** | Proving which server returns which answer, with status and TTL, for a ticket. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/dig.1.html> |
+
+### host
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (package `bind9-host`, pulled in by `bind9-dnsutils`) |
+| **Description** | Short, readable forward and reverse lookups; uses the `search` list; exits 1 when the name is not found. Ignores `/etc/hosts`. |
+| **Syntax** | <code>host [-t TYPE] [-W SEC] [-v] NAME&#124;ADDRESS [SERVER]</code> |
+| **Parameters** | `-t MX` type · `-W` timeout · `-v` verbose (dig-like) |
+| **Example** | `host -t mx corp.example` |
+| **Expected output** | `corp.example mail is handled by 10 mail.corp.example.` · `Host nosuch.corp.example not found: 3(NXDOMAIN)` (captured) |
+| **Equivalent** | `Resolve-DnsName NAME -Type MX` |
+| **Common errors** | Assuming it shows what applications see (it does not read `/etc/hosts`) |
+| **Use case** | Quick checks and simple scripts. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/host.1.html> |
+
+### nslookup
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux (`bind9-dnsutils`) and Windows (`nslookup.exe`) |
+| **Description** | One-shot or interactive DNS lookups; "Non-authoritative answer" = from a resolver. Ignores the hosts file and the system cache. |
+| **Syntax** | <code>nslookup [-type=TYPE] [-timeout=SEC] NAME&#124;ADDRESS [SERVER]</code> |
+| **Parameters** | `-type=soa`, `-type=mx`, `-type=caa` · optional server |
+| **Example** | `nslookup -type=soa corp.example` |
+| **Expected output** | `origin = ns1.corp.example` · `serial = 2026111301` · `minimum = 60` (captured) |
+| **Equivalent** | `dig` · `Resolve-DnsName` |
+| **Common errors** | Parsing its text in scripts · reading `Server: UnKnown` (Windows) as a fault — it only means the server has no PTR |
+| **Use case** | A command that works the same on Linux and Windows in mixed teams. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/nslookup.1.html> |
+
+### resolvectl
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux with systemd-resolved (Ubuntu default; systemd 255 on 24.04). Not present in many containers or on Alpine |
+| **Description** | Shows the real DNS servers, search domains and resolv.conf mode per link; resolves through resolved; flushes and inspects its cache. |
+| **Syntax** | `resolvectl status [LINK]` · `resolvectl dns` · `resolvectl domain` · `resolvectl query [-t TYPE] [--cache=no] NAME` · `resolvectl flush-caches` · `resolvectl statistics` · `resolvectl show-cache` (254+) |
+| **Parameters** | `-t` type · `--cache=no` bypass the cache · `flush-caches`/`show-cache` need sudo |
+| **Example** | `resolvectl status` |
+| **Expected output** | `resolv.conf mode: stub` · `Current DNS Server: 192.168.13.53` (example) |
+| **Equivalent** | `Get-DnsClientServerAddress` · `Clear-DnsClientCache` · `Get-DnsClientCache` |
+| **Common errors** | Reading `/etc/resolv.conf` (`127.0.0.53`) and thinking it is the real server · *command not found* where systemd-resolved is not used |
+| **Use case** | Finding which upstream servers an Ubuntu machine really uses. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/resolvectl.1.html> · <https://man7.org/linux/man-pages/man8/systemd-resolved.service.8.html> |
+
+### getent hosts / ahosts
+
+| Field | Detail |
+|---|---|
+| **OS** | All glibc Linux (libc-bin) |
+| **Description** | Resolves through the Name Service Switch exactly like applications (`/etc/hosts`, mDNS, DNS). `ahosts` uses `getaddrinfo()` and lists every address. Exit 0 found, 2 not found. |
+| **Syntax** | <code>getent hosts&#124;ahosts&#124;ahostsv4&#124;ahostsv6 NAME&#124;ADDRESS</code> |
+| **Parameters** | `hosts` first match · `ahosts` all · `ahostsv4`/`ahostsv6` one family |
+| **Example** | `getent ahosts app.corp.example` |
+| **Expected output** | `192.168.13.99 app.corp.example app` while `dig` says `192.168.13.80` (captured, stale hosts entry) |
+| **Equivalent** | `Resolve-DnsName NAME` (default path) · `[System.Net.Dns]::GetHostAddresses()` |
+| **Common errors** | Expecting it to report NXDOMAIN vs SERVFAIL (it only says found / not found) · AAAA missing on IPv4-only hosts (`AI_ADDRCONFIG`) |
+| **Use case** | Explaining why the application and `dig` disagree. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/getent.1.html> |
+
+### /etc/hosts and /etc/nsswitch.conf
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux |
+| **Description** | `/etc/hosts` maps names to addresses statically and is checked before DNS when `nsswitch.conf` says `hosts: files … dns`. |
+| **Syntax** | hosts: `ADDRESS NAME [ALIAS...]` · nsswitch: `hosts: files mdns4_minimal [NOTFOUND=return] dns` (Ubuntu desktop) / `files dns` (server) |
+| **Parameters** | First matching hosts line wins · `[NOTFOUND=return]` stops after mDNS for `.local` |
+| **Example** | `grep app /etc/hosts ; grep '^hosts:' /etc/nsswitch.conf` |
+| **Expected output** | `192.168.13.99 app.corp.example app   # added during the 2025 migration` (captured, lab fault) |
+| **Equivalent** | `C:\Windows\System32\drivers\etc\hosts` |
+| **Common errors** | Forgotten test entries overriding DNS · editing without a backup |
+| **Use case** | Temporary, documented overrides; detecting tampering (`sha256sum /etc/hosts`). |
+| **Docs** | <https://man7.org/linux/man-pages/man5/hosts.5.html> · <https://man7.org/linux/man-pages/man5/nsswitch.conf.5.html> |
+
+### /etc/resolv.conf
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux; on Ubuntu a symlink managed by systemd-resolved |
+| **Description** | `nameserver`, `search` and `options` for the resolver library. On Ubuntu it links to `stub-resolv.conf` (`127.0.0.53`, stub mode); other modes: uplink (`/run/systemd/resolve/resolv.conf`), static (`/usr/lib/systemd/resolv.conf`), foreign (a regular file). |
+| **Syntax** | `nameserver ADDR` (max 3) · `search DOMAIN...` · `options timeout:N attempts:N edns0 trust-ad` |
+| **Parameters** | `ls -l /etc/resolv.conf` shows the mode |
+| **Example** | `ls -l /etc/resolv.conf ; grep -v '^#' /etc/resolv.conf` |
+| **Expected output** | `/etc/resolv.conf -> ../run/systemd/resolve/stub-resolv.conf` · `nameserver 127.0.0.53` (example) |
+| **Equivalent** | `Get-DnsClientServerAddress` · `Get-DnsClientGlobalSetting` |
+| **Common errors** | Editing it by hand on Ubuntu (change lost) — use Netplan `nameservers:` |
+| **Use case** | Knowing which server `dig` asks by default. |
+| **Docs** | <https://man7.org/linux/man-pages/man5/resolv.conf.5.html> |
+
+## Ports & Sockets
+
+### ss (socket statistics)
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (iproute2, installed by default) · any modern Linux |
+| **Description** | Lists sockets from the kernel (netlink sock_diag): listeners, connections, TCP states, owning processes, timers and TCP internals. Replaces `netstat`. |
+| **Syntax** | <code>ss [-t] [-u] [-l&#124;-a] [-n] [-p] [-4&#124;-6] [-H] [-o] [-e] [-i] [-s] [-K] [state STATE] [EXPRESSION]</code> |
+| **Parameters** | `-tulnp` listeners with owners · `state established` / `close-wait` / `time-wait` · `'( dport = :443 or sport = :443 )'` · `'dst 10.0.0.0/8'` · `-H` no header · `-o` timers · `-e` uid/inode · `-i` RTT/cwnd · `-s` summary · `-K` force-close (root, destructive) |
+| **Example** | `sudo ss -ltnp 'sport = :443'` |
+| **Expected output** | <code>LISTEN 0      5            0.0.0.0:443       0.0.0.0:*    users:(("python3",pid=1125,fd=3))</code> (captured, Lab 14) |
+| **Equivalent** | `Get-NetTCPConnection` · `Get-NetUDPEndpoint` · `netstat -ano` |
+| **Common errors** | Empty process column without `sudo` · forgetting `-n` · unquoted expressions · with a state filter the State column is omitted (field numbers shift) |
+| **Use case** | "Who owns port 443?", exposure audits, CLOSE-WAIT leaks, accept-queue overflows (LISTEN `Recv-Q` ≥ `Send-Q`). |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ss.8.html> |
+
+### netstat (net-tools, legacy)
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux, package net-tools — **not installed** by default on Ubuntu 24.04 (`sudo apt install net-tools`) |
+| **Description** | Legacy socket listing that reads `/proc/net/*`; states are written with underscores (`TIME_WAIT`). Windows `netstat.exe` is a different program with different options. |
+| **Syntax** | <code>netstat [-t] [-u] [-l&#124;-a] [-n] [-p] [-s]</code> |
+| **Parameters** | `-tulnp` listeners with PID/program · `-tan` all TCP · `-s` protocol statistics |
+| **Example** | `sudo netstat -tlnp` |
+| **Expected output** | `tcp        0      0 0.0.0.0:443             0.0.0.0:*               LISTEN      1125/python3` (captured) |
+| **Equivalent** | `ss -tulnp` · `netstat -ano` (Windows) |
+| **Common errors** | `netstat: command not found` on Ubuntu 24.04 · slow with many sockets |
+| **Use case** | Reading old runbooks and other Unix systems; prefer `ss`. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/netstat.8.html> |
+
+### lsof -i
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (package lsof) |
+| **Description** | Lists network sockets as open files of processes: find the process behind a port, or all sockets of a process. |
+| **Syntax** | <code>lsof [-n] [-P] -i &#91;4&#124;6&#93;&#91;PROTO&#93;&#91;@HOST&#93;&#91;:PORT&#93; [-sTCP:STATE] [-a -p PID]</code> |
+| **Parameters** | `-nP` numeric · `-iTCP:443 -sTCP:LISTEN` listeners on 443 · `-i @10.14.0.20` sockets to a host · `-a -p PID -i` sockets of one process |
+| **Example** | `sudo lsof -nP -iTCP:443 -sTCP:LISTEN` |
+| **Expected output** | `python3 1125 nobody    3u  IPv4   5581      0t0  TCP *:443 (LISTEN)` (captured) |
+| **Equivalent** | `Get-NetTCPConnection -LocalPort 443` + `Get-Process` |
+| **Common errors** | No output without `sudo` for other users' processes · slow on busy hosts |
+| **Use case** | Mapping an outbound connection (`local->remote`) to its process during an investigation. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/lsof.8.html> |
+
+### fuser
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (package psmisc) |
+| **Description** | Shows which processes use a port (or a file / mount). |
+| **Syntax** | <code>fuser [-v] -n tcp&#124;udp PORT</code> · `fuser [-v] PORT/tcp` |
+| **Parameters** | `-v` verbose (USER, PID, ACCESS, COMMAND) · `-n tcp` namespace · `-k` **kills** the processes (never during an investigation) |
+| **Example** | `sudo fuser -v -n tcp 443` |
+| **Expected output** | `443/tcp:             nobody     1125 F.... python3` (captured) |
+| **Equivalent** | `Get-NetTCPConnection -LocalPort 443` (`OwningProcess`) |
+| **Common errors** | `fuser: command not found` (install psmisc) · using `-k` and destroying evidence |
+| **Use case** | Quick PID lookup in scripts (`fuser -n tcp 443` prints PIDs only). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/fuser.1.html> |
+
+### /etc/services, /proc/net/tcp and ip_local_port_range
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux (`/etc/services` from package netbase) |
+| **Description** | `/etc/services` maps port numbers to conventional names; `/proc/net/tcp`, `tcp6`, `udp`, `udp6` are the kernel's raw socket tables (hex address:port, state, uid, inode); `net.ipv4.ip_local_port_range` is the ephemeral port range (32768–60999). |
+| **Syntax** | <code>getent services NAME&#124;PORT[/PROTO]</code> · `cat /proc/net/tcp` · `sysctl net.ipv4.ip_local_port_range` |
+| **Parameters** | `/proc/net/tcp` states: `01` ESTABLISHED, `06` TIME_WAIT, `08` CLOSE_WAIT, `0A` LISTEN; IPv4 address little-endian (`0100007F` = 127.0.0.1); port plain hex (`01BB` = 443) |
+| **Example** | `getent services 443/tcp` · `sysctl net.ipv4.ip_local_port_range` |
+| **Expected output** | `https                 443/tcp` · `net.ipv4.ip_local_port_range = 32768 60999` (captured; the two numbers are tab-separated) |
+| **Equivalent** | `C:\Windows\System32\drivers\etc\services` · `netsh int ipv4 show dynamicport tcp` |
+| **Common errors** | Treating a service name as proof of the program · `getent` exit code 2 = not found |
+| **Use case** | Decoding sockets in minimal containers without `ss`; capacity planning for outbound connections. |
+| **Docs** | <https://man7.org/linux/man-pages/man5/services.5.html> · <https://man7.org/linux/man-pages/man5/proc_net.5.html> · <https://man7.org/linux/man-pages/man7/ip.7.html> |

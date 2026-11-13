@@ -1256,3 +1256,157 @@ IP configuration (Day 11) and connectivity testing (Day 12). The `Net*` cmdlets 
 | **Common errors** | Reading `InnerException.Message` (an aggregate message) instead of `GetBaseException()` · always `Dispose()` the client |
 | **Use case** | Port checks in scripts that must also run on Linux. |
 | **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.net.networkinformation.networkinterface> · <https://learn.microsoft.com/en-us/dotnet/api/system.net.sockets.tcpclient> |
+
+## DNS
+
+### Resolve-DnsName
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7.x · **Windows only** (DnsClient module, Windows 8 / Server 2012 and later) |
+| **Description** | DNS query returning objects (`Name`, `Type`, `TTL`, `Section` plus type-specific properties such as `IPAddress`, `NameHost`, `NameExchange`, `Strings`). By default follows the system path (cache, hosts file, NRPT, suffixes, LLMNR/NetBIOS fallback). |
+| **Syntax** | `Resolve-DnsName [-Name] <String> [[-Type] <RecordType>] [-Server <String[]>] [-DnsOnly] [-NoHostsFile] [-CacheOnly] [-NoRecursion] [-QuickTimeout] [-TcpOnly] [-DnssecOk]` |
+| **Parameters** | `-Type` (A, AAAA, A_AAAA default, CNAME, MX, NS, SOA, PTR, TXT, SRV, ANY; no CAA) · `-Server` · `-DnsOnly` · `-NoHostsFile` · `-CacheOnly` · `-NoRecursion` · `-QuickTimeout` · `-TcpOnly` |
+| **Example** | `Resolve-DnsName app.corp.example -Type A -Server 192.168.13.53 -DnsOnly -NoHostsFile` |
+| **Expected output** | `app.corp.example  A  300  Answer  192.168.13.80` (example) |
+| **Equivalent** | `dig @SERVER NAME TYPE` · `getent ahosts` (default path) |
+| **Common errors** | `DNS_ERROR_RCODE_NAME_ERROR` (NXDOMAIN) · `DNS_ERROR_RCODE_SERVER_FAILURE` (SERVFAIL) · `ERROR_TIMEOUT` · NODATA returns only an `Authority` SOA (filter `Section -eq 'Answer'`) · not available in PowerShell on Linux |
+| **Use case** | Scriptable DNS checks with exact status from the error ID. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/dnsclient/resolve-dnsname> |
+
+### Get-DnsClientServerAddress / Set-DnsClientServerAddress
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7.x · Windows only · `Set-` needs **Administrator** |
+| **Description** | Show (or set/reset) the DNS servers per interface and address family. |
+| **Syntax** | `Get-DnsClientServerAddress [-InterfaceAlias <String[]>] [-AddressFamily IPv4,IPv6]` · <code>Set-DnsClientServerAddress -InterfaceAlias &lt;String&gt; (-ServerAddresses &lt;String[]&gt; &#124; -ResetServerAddresses) [-WhatIf]</code> |
+| **Parameters** | `-AddressFamily` · `-ServerAddresses` · `-ResetServerAddresses` (back to DHCP) · `-WhatIf` |
+| **Example** | `Get-DnsClientServerAddress -AddressFamily IPv4` |
+| **Expected output** | `Ethernet  {192.168.13.53, 192.168.13.54}` (example) |
+| **Equivalent** | `resolvectl dns` · Netplan `nameservers:` |
+| **Common errors** | Treating `fec0:0:0:ffff::1/2/3` (unconfigured IPv6 defaults) as real servers · changing servers without exporting the old values |
+| **Use case** | First step of every Windows DNS ticket; detecting rogue resolver changes. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/dnsclient/get-dnsclientserveraddress> · <https://learn.microsoft.com/en-us/powershell/module/dnsclient/set-dnsclientserveraddress> |
+
+### Get-DnsClientCache / Clear-DnsClientCache
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7.x · Windows only · `Clear-` needs **Administrator** |
+| **Description** | Show the DNS Client cache (positive and negative entries, hosts-file entries) / empty it. |
+| **Syntax** | `Get-DnsClientCache [-Entry <String[]>] [-Type <Type[]>] [-Status <Status[]>]` · `Clear-DnsClientCache [-WhatIf]` |
+| **Parameters** | `-Entry` one name · `Status` values such as `Success`, `NotExist`, `NoRecords` |
+| **Example** | `Get-DnsClientCache -Entry mail.corp.example` |
+| **Expected output** | `mail.corp.example  1  Success  297  192.168.13.25` (example; `Type` is numeric) |
+| **Equivalent** | `sudo resolvectl show-cache` / `flush-caches` · `ipconfig /displaydns` / `/flushdns` |
+| **Common errors** | Expecting it to flush the company resolver's cache · hosts entries reappearing (reloaded from the file) |
+| **Use case** | Removing a stale local answer after a DNS change. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/dnsclient/get-dnsclientcache> · <https://learn.microsoft.com/en-us/powershell/module/dnsclient/clear-dnsclientcache> |
+
+### ipconfig /displaydns /flushdns and nslookup.exe (native)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (any shell) · `/flushdns` and `/registerdns`: run elevated |
+| **Description** | `ipconfig /all` shows DNS servers and suffixes; `/displaydns` and `/flushdns` show and empty the DNS Client cache; `/registerdns` re-registers the host's records. `nslookup` queries a server directly, ignoring the hosts file and cache. |
+| **Syntax** | `ipconfig /all` · `ipconfig /displaydns` · `ipconfig /flushdns` · `nslookup [-type=TYPE] NAME [SERVER]` |
+| **Parameters** | `-type=mx`, `-type=caa`, `-type=soa` |
+| **Example** | `nslookup -type=caa corp.example` |
+| **Expected output** | `Successfully flushed the DNS Resolver Cache.` (example) |
+| **Equivalent** | `Get-DnsClientCache` · `Clear-DnsClientCache` · `dig` |
+| **Common errors** | `Server: UnKnown` (server has no PTR — cosmetic) · parsing localised text |
+| **Use case** | Quick checks on any Windows machine; CAA lookups (not supported by `Resolve-DnsName`). |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ipconfig> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/nslookup> |
+
+### [System.Net.Dns] (cross-platform)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7.x · **all OS** |
+| **Description** | System-resolver lookups (hosts file included): `GetHostAddresses()` forward, `GetHostEntry()` reverse. No server choice, no record types beyond A/AAAA/PTR, no TTL. |
+| **Syntax** | `[System.Net.Dns]::GetHostAddresses('NAME')` · `[System.Net.Dns]::GetHostEntry('ADDR').HostName` · `GetHostAddressesAsync()` with `.Wait(ms)` for a timeout |
+| **Parameters** | Filter by `AddressFamily` (`InterNetwork`, `InterNetworkV6`) |
+| **Example** | `[System.Net.Dns]::GetHostAddresses('www.corp.example').IPAddressToString` |
+| **Expected output** | `192.168.13.80` (example) |
+| **Equivalent** | `getent ahosts` · `getent hosts ADDR` |
+| **Common errors** | `SocketException: No such host is known` (not found) · expecting per-server queries |
+| **Use case** | DNS checks in scripts that must also run in PowerShell 7 on Linux. |
+| **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.net.dns> |
+
+## Ports & Sockets
+
+### Get-NetTCPConnection
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetTCPIP module) |
+| **Description** | One object per TCP socket: `LocalAddress`, `LocalPort`, `RemoteAddress`, `RemotePort`, `State`, `OwningProcess`, `CreationTime`. The standard way to find which process listens on, or is connected to, a port. |
+| **Syntax** | <code>Get-NetTCPConnection [[-LocalAddress] &lt;String[]&gt;] [[-LocalPort] &lt;UInt16[]&gt;] [-RemoteAddress &lt;String[]&gt;] [-RemotePort &lt;UInt16[]&gt;] [-State &lt;State[]&gt;] [-OwningProcess &lt;UInt32[]&gt;] [-CimSession &lt;CimSession[]&gt;]</code> |
+| **Parameters** | `-State Listen` / `Established` / `TimeWait` / `CloseWait` / `SynSent` / `Bound` … · `-LocalPort 443` · `-RemotePort 443` · `-OwningProcess PID` |
+| **Example** | `Get-Process -Id (Get-NetTCPConnection -LocalPort 443 -State Listen).OwningProcess` |
+| **Expected output** | `127.0.0.1  48443 Listen  7316` (example) |
+| **Equivalent** | `ss -ltnp 'sport = :443'` · `lsof -iTCP:443 -sTCP:LISTEN` |
+| **Common errors** | *No MSFT_NetTCPConnection objects found* when nothing matches (use `-ErrorAction SilentlyContinue`) · *not recognized* in PowerShell 7 on Linux · TIME-WAIT rows have `OwningProcess 0` · PID 4 = kernel (HTTP.sys, SMB) |
+| **Use case** | "Port already in use" (10048) on IIS or a service; listener baselines; outbound-connection hunting. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection> |
+
+### Get-NetUDPEndpoint
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetTCPIP) |
+| **Description** | One object per UDP endpoint: `LocalAddress`, `LocalPort`, `OwningProcess`, `CreationTime` (UDP has no states). |
+| **Syntax** | <code>Get-NetUDPEndpoint [[-LocalAddress] &lt;String[]&gt;] [[-LocalPort] &lt;UInt16[]&gt;] [-OwningProcess &lt;UInt32[]&gt;] [-CimSession &lt;CimSession[]&gt;]</code> |
+| **Parameters** | `-LocalPort 53` · `-LocalAddress 0.0.0.0` · `-OwningProcess PID` |
+| **Example** | `Get-NetUDPEndpoint -LocalPort 53, 123 -ErrorAction SilentlyContinue` |
+| **Expected output** | `0.0.0.0   123   3412` (example) |
+| **Equivalent** | `ss -lunp` |
+| **Common errors** | Hundreds of ephemeral endpoints (browsers, svchost) make raw lists noisy; filter by port |
+| **Use case** | Finding a rogue DNS/DHCP/syslog listener. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netudpendpoint> |
+
+### netstat -ano / tasklist /svc (native)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (any shell) |
+| **Description** | `netstat -ano` lists all connections and listeners numerically with the owning PID; `-b` adds the executable/components (**elevated only**). `tasklist /svc` shows the services hosted in a PID. |
+| **Syntax** | <code>netstat [-a] [-b] [-e] [-n] [-o] [-p &lt;Protocol&gt;] [-q] [-r] [-s] [&lt;interval&gt;]</code> · <code>tasklist /svc /fi "PID eq &lt;PID&gt;"</code> |
+| **Parameters** | `-ano` all/numeric/PID · `-b` executable · `-p tcp` · `-q` bound ports · `-s` statistics |
+| **Example** | <code>netstat -ano &#124; Select-String ':443 '</code> · `tasklist /svc /fi "PID eq 1172"` |
+| **Expected output** | `TCP    0.0.0.0:135    0.0.0.0:0    LISTENING    1172` · `svchost.exe   1172 RpcEptMapper, RpcSs` (example) |
+| **Equivalent** | `netstat -tulnp` / `ss -tulnp` (Linux) · `systemctl status PID` |
+| **Common errors** | `-b` → *The requested operation requires elevation* · parsing localised text in scripts |
+| **Use case** | Quick checks on servers without the NetTCPIP module or in `cmd.exe`. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netstat> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/tasklist> |
+
+### Get-NetTCPSetting / netsh dynamic ports
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** |
+| **Description** | TCP settings per profile, including the ephemeral range (`DynamicPortRangeStartPort`, `DynamicPortRangeNumberOfPorts`); `netsh` shows (and, elevated, sets) the same range and the excluded/reserved port ranges. |
+| **Syntax** | <code>Get-NetTCPSetting [[-SettingName] &lt;String[]&gt;]</code> · <code>netsh int ipv4 show dynamicport tcp&#124;udp</code> · `netsh int ipv4 show excludedportrange protocol=tcp` |
+| **Parameters** | `-SettingName Internet` |
+| **Example** | <code>Get-NetTCPSetting -SettingName Internet &#124; Select-Object DynamicPortRange*</code> |
+| **Expected output** | `Start Port : 49152` · `Number of Ports : 16384` (example) |
+| **Equivalent** | `sysctl net.ipv4.ip_local_port_range` |
+| **Common errors** | Binding fails with 10013 inside a reserved range (Hyper-V, WinNAT) · changing the range without a capacity reason |
+| **Use case** | Diagnosing ephemeral-port exhaustion (Tcpip events 4227/4231) on proxies and middleware. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpsetting> · <https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/default-dynamic-port-range-tcpip-chang> |
+
+### .NET IPGlobalProperties (cross-platform)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7.x · **all OS** |
+| **Description** | `GetActiveTcpListeners()`, `GetActiveUdpListeners()` (`IPEndPoint`: `Address`, `Port`) and `GetActiveTcpConnections()` (`LocalEndPoint`, `RemoteEndPoint`, `State`). No process IDs. |
+| **Syntax** | `[System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()` |
+| **Parameters** | — (methods) |
+| **Example** | <code>$ip = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties(); $ip.GetActiveTcpConnections() &#124; Group-Object State</code> |
+| **Expected output** | `0.0.0.0  22` / `::  22` (example, PowerShell 7 on Ubuntu) |
+| **Equivalent** | `ss -Hltn` |
+| **Common errors** | Expecting owners (use `Get-NetTCPConnection` on Windows or `ss -p` on Linux) |
+| **Use case** | Portable listener baselines (`Port-Monitor.ps1` on Linux/macOS). |
+| **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.net.networkinformation.ipglobalproperties> |

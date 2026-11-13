@@ -22,6 +22,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 10 | [Software and Package Management](../course/module-2/day-10.md#quiz) |
 | 11 | [IP Configuration](../course/module-3/day-11.md#quiz) |
 | 12 | [Connectivity Troubleshooting](../course/module-3/day-12.md#quiz) |
+| 13 | [DNS Troubleshooting](../course/module-3/day-13.md#quiz) |
+| 14 | [Ports, Sockets and Connections](../course/module-3/day-14.md#quiz) |
 
 ## Module tests
 

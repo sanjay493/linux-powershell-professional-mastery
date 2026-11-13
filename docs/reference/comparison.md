@@ -278,3 +278,46 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Exact socket error | `nc -zv` message | `TcpClient` + `GetBaseException().SocketErrorCode` | refused vs timed out |
 | HTTP test | `curl -v URL` · `curl -w` timings | `Invoke-WebRequest URL` · `curl.exe -v URL` | `curl` = `Invoke-WebRequest` alias in 5.1 ⚠ |
 | Is it routing? | `sysctl net.ipv4.ip_forward` | <code>Get-NetIPInterface &#124; Select-Object InterfaceAlias, Forwarding</code> | |
+
+## Networking: DNS
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Real DNS servers | `resolvectl status` · `resolvectl dns` | `Get-DnsClientServerAddress` · `ipconfig /all` | Ubuntu's `/etc/resolv.conf` shows the `127.0.0.53` stub |
+| Search domains | `resolvectl domain` | `Get-DnsClientGlobalSetting` · `Get-DnsClient` | |
+| Resolve like an application | `getent ahosts NAME` · `resolvectl query NAME` | `Resolve-DnsName NAME` · `[System.Net.Dns]::GetHostAddresses()` | Hosts file included |
+| Pure DNS query | `dig NAME` | `Resolve-DnsName NAME -DnsOnly -NoHostsFile` · `nslookup NAME` | `dig`/`nslookup` ignore hosts files ⚠ |
+| Ask one server | `dig @SERVER NAME` | `Resolve-DnsName NAME -Server SERVER` | |
+| Record type | `dig NAME MX` · `host -t MX NAME` | `Resolve-DnsName NAME -Type MX` | No CAA in `Resolve-DnsName`; use `nslookup -type=CAA` |
+| Data only | `dig +short NAME` | `(Resolve-DnsName NAME -Type A).IPAddress` | `+short` hides the status |
+| Reverse (PTR) | `dig -x ADDR` · `host ADDR` | `Resolve-DnsName ADDR -Type PTR` | |
+| Authoritative / cache test | `dig @SERVER NAME +norecurse` | `Resolve-DnsName NAME -Server SERVER -NoRecursion` | `aa` flag = authoritative |
+| TCP | `dig +tcp NAME` | `Resolve-DnsName NAME -TcpOnly` | |
+| Delegation trace | `dig +trace NAME` | — | |
+| Status of a failure | `status:` in the header (exit 0 even for NXDOMAIN; 9 = no reply) | `FullyQualifiedErrorId`: `DNS_ERROR_RCODE_NAME_ERROR`, `…SERVER_FAILURE`, `…REFUSED`, `ERROR_TIMEOUT` | ⚠ |
+| Show / flush local cache | `sudo resolvectl show-cache` · `sudo resolvectl flush-caches` | `Get-DnsClientCache` · `Clear-DnsClientCache` (elevated) | Resolver caches are separate |
+| Hosts file | `/etc/hosts` | `C:\Windows\System32\drivers\etc\hosts` | Checked before DNS |
+| Set DNS servers | Netplan `nameservers:` + `netplan try` | `Set-DnsClientServerAddress … -WhatIf` (elevated) | |
+| Multi-resolver check | `dns-check.sh -n NAMES -s system,IP1,IP2 -r` | `DNS-Check.ps1 -Name … -Server System, IP1 -Reverse` | Exit 3 on failure or disagreement |
+
+## Networking: ports and sockets
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| All listeners with owners | `sudo ss -tulnp` | `Get-NetTCPConnection -State Listen` · `Get-NetUDPEndpoint` | `sudo` needed for other users' processes on Linux |
+| Who listens on a port? | `sudo ss -ltnp 'sport = :443'` · `sudo lsof -nP -iTCP:443 -sTCP:LISTEN` · `sudo fuser -v -n tcp 443` | `Get-NetTCPConnection -LocalPort 443 -State Listen` → `Get-Process -Id OWNER` | |
+| PID → services | `systemctl status PID` | `Get-CimInstance Win32_Service -Filter "ProcessId = PID"` · `tasklist /svc /fi "PID eq PID"` | One svchost can host many services |
+| Sockets of one process | `sudo lsof -nP -a -p PID -i` | `Get-NetTCPConnection -OwningProcess PID` | |
+| Established connections | `ss -tn state established` | `Get-NetTCPConnection -State Established` | Ephemeral local port = outbound |
+| Filter by remote host / port | `ss -tn 'dst 10.0.0.5'` · `ss -tn 'dport = :443'` | `-RemoteAddress 10.0.0.5` · `-RemotePort 443` | |
+| Count by state | <code>ss -tan &#124; awk 'NR>1{print $1}' &#124; sort &#124; uniq -c</code> | <code>Get-NetTCPConnection &#124; Group-Object State</code> | |
+| Leaks / waits | `sudo ss -tnp state close-wait` · `ss -tno state time-wait` | `Get-NetTCPConnection -State CloseWait, TimeWait` | TIME-WAIT: no owner / PID 0 |
+| TIME-WAIT duration | 60 s (fixed) | 120 s default (`TcpTimedWaitDelay`) | ⚠ |
+| Ephemeral range | `sysctl net.ipv4.ip_local_port_range` (32768–60999) | `netsh int ipv4 show dynamicport tcp` (49152–65535) | ⚠ |
+| Accept-queue drops | `ss -ltn` (`Recv-Q` vs `Send-Q`) · `nstat -az TcpExtListenOverflows` | `netstat -s` | |
+| TCP internals | `ss -ti` | `Get-NetTCPConnection` + `Get-NetTCPSetting` | No per-connection RTT cmdlet |
+| Native legacy tool | `netstat -tulnp` (net-tools, not default) | `netstat -ano` (`-b` elevated) | Different options |
+| Port names | `getent services 443/tcp` | `C:\Windows\System32\drivers\etc\services` | Convention only |
+| Address in use | `EADDRINUSE` (errno 98) | 10048 `WSAEADDRINUSE` | Also TIME-WAIT without `SO_REUSEADDR` |
+| Cross-platform API | — | `IPGlobalProperties.GetActiveTcpListeners()` | No PIDs |
+| Baseline + diff | `ss -Hltun` → file · `diff`/`comm` · `port-monitor.sh -s FILE` / `-b FILE` | `Export-Csv` + `Compare-Object` · `Port-Monitor.ps1 -SaveBaselinePath` / `-BaselinePath` | Same baseline file format |
