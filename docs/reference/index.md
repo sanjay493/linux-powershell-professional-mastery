@@ -61,7 +61,8 @@ A searchable reference for every command taught in the course. Use the **search 
 | Networking: IP configuration & connectivity | :material-check: | :material-check: | Days 11–12 |
 | Networking: DNS | :material-check: | :material-check: | Day 13 |
 | Networking: ports & sockets | :material-check: | :material-check: | Day 14 |
-| Interfaces & capture | Day 15 | Day 15 | |
-| Logs, security, firewall | Days 16–20 | Days 16–20 | |
+| Interfaces & packet capture | :material-check: | :material-check: | Day 15 |
+| Logs | :material-check: | :material-check: | Day 16 |
+| Authentication, security, firewall | Days 17–20 | Days 17–20 | |
 | Scripting & automation | Days 21–25 | Days 21–25 | |
 | Remote administration | Day 26 | Day 26 | |

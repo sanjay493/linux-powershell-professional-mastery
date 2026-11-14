@@ -1425,3 +1425,219 @@ IP configuration (Day 11) and connectivity testing (Day 12). `ip` comes from **i
 | **Common errors** | Treating a service name as proof of the program · `getent` exit code 2 = not found |
 | **Use case** | Decoding sockets in minimal containers without `ss`; capacity planning for outbound connections. |
 | **Docs** | <https://man7.org/linux/man-pages/man5/services.5.html> · <https://man7.org/linux/man-pages/man5/proc_net.5.html> · <https://man7.org/linux/man-pages/man7/ip.7.html> |
+
+## Interfaces & Packet Capture
+
+### ip -s -s link / ip -d link / ip -br link
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (iproute2, installed by default) · any modern Linux |
+| **Description** | Deeper interface views: `-br` one line per interface (state, MAC, flags), `-d` type-specific details (veth peer, bridge, VLAN ID, bond), `-s -s` RX/TX counters with error breakdown (crc, frame, overrun, carrier, collisions, `transns` = carrier changes). Counters also in `/sys/class/net/IF/statistics/`. |
+| **Syntax** | <code>ip [-br] [-d] [-s [-s]] [-j] link show [dev IFACE]</code> |
+| **Parameters** | `UP` admin up · `LOWER_UP` carrier · `NO-CARRIER` no link · `state UP/DOWN/UNKNOWN/LOWERLAYERDOWN/DORMANT` · `-j` JSON · `/sys/class/net/IF/carrier_changes` link flaps |
+| **Example** | `ip -s -s link show dev eth0` |
+| **Expected output** | `TX errors: aborted   fifo  window heartbt transns` / `0      0       0       0       2` (captured, Lab 15) |
+| **Equivalent** | `Get-NetAdapter` · `Get-NetAdapterStatistics` |
+| **Common errors** | Reading `UP` as "link up" (check `LOWER_UP`) · judging counters from one reading · `ip link set … down` over SSH |
+| **Use case** | Proving a flapping link (`carrier_changes` growing) or a bad cable (CRC errors growing). |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ip-link.8.html> · <https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-class-net> |
+
+### ethtool
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (package ethtool) |
+| **Description** | Queries and changes NIC driver settings: speed, duplex, auto-negotiation, link detected, driver/firmware, driver statistics, offloads, ring buffers. Virtual NICs report arbitrary speed/duplex. |
+| **Syntax** | <code>ethtool [-S &#124; -i &#124; -k &#124; -g] IFACE</code> · `ethtool -s IFACE speed N duplex full autoneg on` · `ethtool -K IFACE FEATURE on/off` |
+| **Parameters** | (none) link settings · `-S` driver stats (`rx_crc_errors`…) · `-i` driver info · `-k`/`-K` offloads · `-g`/`-G` ring sizes · `-s` change link (root) |
+| **Example** | <code>sudo ethtool enp0s31f6 &#124; grep -E 'Speed&#124;Duplex&#124;Link detected'</code> |
+| **Expected output** | `Speed: 10000Mb/s` · `Duplex: Full` · `Link detected: yes` (captured on a veth, Lab 15) |
+| **Equivalent** | `Get-NetAdapter` (`LinkSpeed`, `FullDuplex`) · `Get-NetAdapterAdvancedProperty` |
+| **Common errors** | `ethtool: command not found` (install) · trusting VM speed values · forcing speed/duplex on one side only (duplex mismatch) |
+| **Use case** | A gigabit NIC at 100 Mb/s with CRC errors = damaged cable. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ethtool.8.html> |
+
+### ip neigh (states, del, flush) and arping
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (iproute2; `arping` from package iputils-arping) |
+| **Description** | Neighbour (ARP/NDP) cache with states INCOMPLETE, REACHABLE, STALE, DELAY, PROBE, FAILED, PERMANENT; `arping` sends ARP requests to see which MAC answers, detects duplicate addresses (`-D`) and announces an address (`-U`). |
+| **Syntax** | <code>ip [-s] neigh show [dev IF] [nud STATE]</code> · `ip neigh del IP dev IF` · `ip neigh flush dev IF` · <code>arping [-D &#124; -U] [-c N] -I IF IP</code> |
+| **Parameters** | `nud permanent` static entries · `flush` removes dynamic entries only · `arping -D` exit 0 = free, 1 = in use |
+| **Example** | `sudo arping -D -q -c 2 -I eth0 10.15.0.20; echo $?` |
+| **Expected output** | `1` (duplicate present) · `Unicast reply from 10.15.0.20 [02:15:00:00:00:66]` (captured, Lab 15) |
+| **Equivalent** | `Get-NetNeighbor` · `Remove-NetNeighbor` · `arp -a` · Tcpip event 4199 |
+| **Common errors** | `ip neigh flush` does not remove a wrong PERMANENT entry · the other `arping` package has different options · `arping` needs root |
+| **Use case** | Duplicate IP ("ping works, TCP refused"), wrong static gateway entry. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ip-neighbour.8.html> · <https://man7.org/linux/man-pages/man8/arping.8.html> · <https://man7.org/linux/man-pages/man7/arp.7.html> |
+
+### ip monitor
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (iproute2) |
+| **Description** | Prints kernel events for links, addresses, routes and neighbours as they happen. |
+| **Syntax** | <code>ip [-timestamp] monitor [link] [address] [route] [neigh]</code> |
+| **Parameters** | `-timestamp` adds a timestamp line per event · objects to watch |
+| **Example** | `ip -timestamp monitor link neigh` |
+| **Expected output** | `Timestamp: Sat Nov 14 16:46:28 2026 196169 usec` / `2: eth0@if4: <NO-CARRIER,BROADCAST,MULTICAST,UP> … state DOWN` (captured) |
+| **Equivalent** | No event cmdlet; poll `Get-NetAdapter` / `Get-NetNeighbor` |
+| **Common errors** | Forgetting to stop it (Ctrl+C) · watching the wrong network namespace |
+| **Use case** | Timestamping link flaps and ARP changes while reproducing an intermittent fault. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ip-monitor.8.html> |
+
+### tcpdump
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (package tcpdump; capturing needs root or CAP_NET_RAW/CAP_NET_ADMIN) |
+| **Description** | Captures packets matching a BPF capture filter, prints them or writes/reads pcap files. Ubuntu's build drops privileges to the `tcpdump` user after opening the device. |
+| **Syntax** | <code>tcpdump [-D] [-i IF] [-n] [-e] [-v] [-c N] [-s LEN] [-w FILE [-C MB -W N]] [-r FILE] ['FILTER']</code> |
+| **Parameters** | `-n` no name lookups · `-e` MACs · `-c` count · `-s 128` headers only · `-w`/`-r` pcap · `-C -W` ring buffer · filters `host`, `net`, `port`, `arp`, `icmp`, `tcp[tcpflags] & tcp-syn != 0`, `not port 22` |
+| **Example** | `sudo tcpdump -i eth0 -n -s 128 -w r2.pcap 'tcp port 50000'` |
+| **Expected output** | `IP 10.15.0.10.50000 > 10.15.0.20.8080: Flags [S], … options [mss 1460,…], length 0` (captured, Lab 15) |
+| **Equivalent** | `pktmon` · `netsh trace` · Wireshark/Npcap |
+| **Common errors** | `You don't have permission to capture` (no root) · `…pcap0: Permission denied` with `-C` (privilege drop) · forgetting `-n` · capturing your own SSH session |
+| **Use case** | Proving an MTU black hole (retransmitted 1514-byte frames) or ARP poisoning. Capture only where authorised. |
+| **Docs** | <https://www.tcpdump.org/manpages/tcpdump.1.html> · <https://www.tcpdump.org/manpages/pcap-filter.7.html> |
+
+### tshark / Wireshark
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (packages tshark, wireshark; universe) · Windows/macOS (Wireshark) |
+| **Description** | Protocol analyser with display filters and expert analysis (retransmissions, ARP conflicts). `tshark` is the command-line version. |
+| **Syntax** | <code>tshark [-n] [-r FILE] [-Y 'DISPLAY FILTER'] [-T fields -e FIELD] [-q -z STAT]</code> |
+| **Parameters** | `-Y 'tcp.analysis.retransmission'` · `-Y 'arp.duplicate-address-detected'` · `-T fields -e arp.src.hw_mac` · `-z conv,tcp` · `capinfos FILE` |
+| **Example** | `tshark -n -r r2-srv.pcap -Y 'tcp.analysis.retransmission'` |
+| **Expected output** | `19 0.003805 10.15.0.20 → 10.15.0.10 TCP 1514 [TCP Retransmission] 8080 → 50000 [ACK] Seq=14687 …` (captured) |
+| **Equivalent** | Wireshark on Windows (open `pktmon etl2pcap` output) |
+| **Common errors** | Using BPF syntax in `-Y` (or display syntax in a capture filter) · `Couldn't run dumpcap … Permission denied` (not in `wireshark` group) |
+| **Use case** | Finding retransmissions, resets and ARP conflicts in an evidence pcap. |
+| **Docs** | <https://www.wireshark.org/docs/man-pages/tshark.html> · <https://www.wireshark.org/docs/dfref/> |
+
+### ping -M do -s / tracepath (MTU tests)
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (iputils-ping, iputils-tracepath) |
+| **Description** | `ping -M do -s N` sends N bytes of payload with "don't fragment" (IP size = N + 28); `tracepath` discovers the path MTU from ICMP messages of routers. |
+| **Syntax** | <code>ping -M do -s PAYLOAD [-c N] HOST</code> · `tracepath -n HOST` |
+| **Parameters** | `-M do` prohibit fragmentation · `-s 1472` = 1500-byte packet |
+| **Example** | `ping -c 1 -W 1 -M do -s 1372 10.15.0.20` |
+| **Expected output** | `1380 bytes from 10.15.0.20: icmp_seq=1 ttl=64 time=0.059 ms` (captured) |
+| **Equivalent** | `ping -f -l 1472 HOST` (Windows) |
+| **Common errors** | Plain `ping -s` without `-M do` (fragments locally) · expecting `tracepath` to see a switch's smaller MTU (silent drops) |
+| **Use case** | "Small requests work, big transfers hang." |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ping.8.html> · <https://man7.org/linux/man-pages/man8/tracepath.8.html> |
+
+## Logs
+
+The basic `journalctl -u` entry is under [Processes & Services](#journalctl-u); the entries below cover the full log toolkit from Day 16.
+
+### journalctl (filters and output formats)
+
+| Field | Detail |
+|---|---|
+| **OS** | systemd-based distributions (Ubuntu 24.04: systemd 255). Whole system journal: root or members of `adm` / `systemd-journal` |
+| **Description** | Queries the structured systemd journal by unit, tag, boot, priority, time, text and field, in human or machine formats. Fields starting with `_` (`_PID`, `_COMM`, `_UID`, `_SYSTEMD_UNIT`) are added by journald and cannot be faked by the sender. |
+| **Syntax** | <code>journalctl [-u UNIT] [-t ID] [-b [±N]] [--list-boots] [-k] [-p PRIO&#124;FROM..TO] [--since T] [--until T] [-g REGEX] [-n N] [-r] [-f] [-o FORMAT] [--output-fields=F,…] [--utc] [-q] [--no-pager] [FIELD=VALUE…] [-F FIELD]</code> |
+| **Parameters** | `-t sudo` tag · `-b -1` previous boot (persistent journal) · `-k` kernel · `-p err` = 0–3, `-p warning..err` = 4–3 · `--since "2026-11-13 03:00"`, `"10 min ago"`, `today` · `-g` regex on MESSAGE · `_COMM=sshd`, `_PID=` · `-F SYSLOG_IDENTIFIER` list values · `-o short-iso-precise` / `cat` / `verbose` / `json` / `json-pretty` / `export` |
+| **Example** | `sudo journalctl -t lab16-app -p err -o short-iso --no-pager` |
+| **Expected output** | `2026-11-14T16:44:18+00:00 ubuntu-lab lab16-app[1890]: cannot open database, shutting down` (captured, Day 16) |
+| **Equivalent** | `Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2; StartTime=…}` |
+| **Common errors** | `-- No entries --` (exit 0) for a wrong tag/unit or time zone · *No journal files were opened due to insufficient permissions* · *Specifying boot ID or boot offset has no effect, no persistent journal was found* · `-g` searches MESSAGE only, not the tag · *Failed to parse timestamp* |
+| **Use case** | Reconstructing what happened before a crash (`-b -1 -p warning`), auditing `sudo` use (`-t sudo`), exporting JSON to a SIEM. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/journalctl.1.html> · <https://man7.org/linux/man-pages/man7/systemd.journal-fields.7.html> |
+
+### journalctl --disk-usage / --vacuum-* / --verify and journald.conf
+
+| Field | Detail |
+|---|---|
+| **OS** | systemd-based distributions; changes need root |
+| **Description** | Shows journal size, deletes **archived** journal files by size/age/count (destructive, no dry run) and checks file consistency. Retention and persistence are set in `journald.conf` (`Storage=auto` persists only if `/var/log/journal` exists; `SystemMaxUse=` default 10% of the filesystem, max 4 GiB). Ubuntu ships `ForwardToSyslog=yes` in `/usr/lib/systemd/journald.conf.d/syslog.conf`. |
+| **Syntax** | `journalctl --disk-usage` · `journalctl --vacuum-size=BYTES` · `--vacuum-time=TIME` · `--vacuum-files=N` · `journalctl --rotate` · `journalctl --verify` · `systemd-analyze cat-config systemd/journald.conf` |
+| **Parameters** | `--vacuum-size=500M` · `--vacuum-time=4weeks` · drop-in `/etc/systemd/journald.conf.d/50-retention.conf` with `SystemMaxUse=1G`, `MaxRetentionSec=3month` |
+| **Example** | `journalctl --disk-usage` |
+| **Expected output** | `Archived and active journals take up 8.0M in the file system.` · `PASS: /run/log/journal/…/system.journal` (captured) |
+| **Equivalent** | `Get-WinEvent -ListLog System` (`MaximumSizeInBytes`, `LogMode`) · `wevtutil gl System` |
+| **Common errors** | Vacuuming during an investigation (evidence lost) · editing `/etc/systemd/journald.conf` without a backup · forgetting `systemctl restart systemd-journald` |
+| **Use case** | `/var` filling up: check `--disk-usage`, then set a size limit in a drop-in instead of deleting history. |
+| **Docs** | <https://man7.org/linux/man-pages/man5/journald.conf.5.html> · <https://man7.org/linux/man-pages/man1/journalctl.1.html> |
+
+### dmesg
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux (util-linux). Ubuntu: `kernel.dmesg_restrict = 1`, so root only |
+| **Description** | Prints the kernel ring buffer: drivers, disks, file systems, link changes, OOM killer, segfaults. The buffer is small, in memory and starts empty at each boot; `journalctl -k` is the durable copy. |
+| **Syntax** | <code>dmesg [-T] [-x] [-H] [-l LEVEL[,LEVEL…]] [-w]</code> |
+| **Parameters** | `-T` human time (approximate; wrong after suspend) · `-l err,warn` · `-x` facility/level · `-w` follow · `-c`/`-C` read-and-clear / clear (destructive) |
+| **Example** | `sudo dmesg -T -l err,warn` |
+| **Expected output** | `[Sat Nov 14 16:44:18 2026] lab16: test message written to /dev/kmsg` (captured) |
+| **Equivalent** | `Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-Kernel-*'}` (no direct equivalent) |
+| **Common errors** | `dmesg: read kernel buffer failed: Operation not permitted` without `sudo` · trusting `-T` times |
+| **Use case** | Disk I/O errors, NIC link flaps and OOM kills during an outage. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/dmesg.1.html> |
+
+### logger / systemd-cat
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux (`logger`: bsdutils; `systemd-cat`: systemd) |
+| **Description** | `logger` writes a syslog message (facility, severity, tag); `systemd-cat` sends a command's stdout/stderr to the journal (no facility). Used by scripts and to test the logging pipeline. |
+| **Syntax** | `logger [-t TAG] [-p FACILITY.LEVEL] [--id[=PID]] [MESSAGE]` · `systemd-cat [-t ID] [-p PRIORITY] [COMMAND…]` |
+| **Parameters** | `-p local0.err` (facilities `user` default, `auth`, `daemon`, `local0`–`local7`; levels `emerg`…`debug`) · `-t backup` · `--id=PID` claimed PID (stored as `SYSLOG_PID`; the journal keeps the real `_PID`) |
+| **Example** | `logger -t lab16-app -p local0.err "write failed: No space left on device"` |
+| **Expected output** | `2026-11-14T16:44:18.655792+00:00 ubuntu-lab lab16-app: write failed: No space left on device (file=/srv/lab16/data/cache.db)` in `/var/log/syslog` (captured) |
+| **Equivalent** | `eventcreate /T ERROR /ID 900 /L APPLICATION /SO Lab16 /D "…"` · `Write-EventLog` (5.1 only) |
+| **Common errors** | Expecting `auth.*` messages in `/var/log/syslog` (they go to `auth.log`) · believing a tag proves the writer (check `_COMM`) |
+| **Use case** | Logging from cron jobs and shell scripts with a filterable tag; testing alert rules. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/logger.1.html> · <https://man7.org/linux/man-pages/man1/systemd-cat.1.html> |
+
+### /var/log, rsyslog rules and zcat / zgrep
+
+| Field | Detail |
+|---|---|
+| **OS** | Debian/Ubuntu names (`syslog`, `auth.log`, `kern.log`); RHEL family: `messages`, `secure`. Files `syslog:adm 0640` |
+| **Description** | rsyslog writes text logs according to `/etc/rsyslog.d/50-default.conf` (`facility.priority action`). Since Ubuntu 23.10 lines use RFC 3339 timestamps (`2026-11-13T03:12:04.118734+00:00`) that sort correctly as text. Rotated copies are `.1`, `.2.gz`, …; `zcat`/`zgrep` read compressed and plain files. |
+| **Syntax** | `zgrep [-h] [-c] PATTERN FILE…` · `zcat FILE.gz` · `rsyslogd -N1` (check config) |
+| **Parameters** | Rules: `auth,authpriv.* /var/log/auth.log` · `*.*;auth,authpriv.none -/var/log/syslog` · `kern.* -/var/log/kern.log` · forwarding `*.* @@server:514` (TCP) |
+| **Example** | <code>sudo zgrep -h '203.0.113.45' /var/log/auth.log* &#124; wc -l</code> |
+| **Expected output** | `auth.log:26` · `auth.log.1:3` · `auth.log.2.gz:0` for `zgrep -c 'Failed password' auth.log auth.log.1 auth.log.2.gz` (captured, Lab 16) |
+| **Equivalent** | `Select-String -Path` (plain files only) · `Get-WinEvent -Path file.evtx` |
+| **Common errors** | `grep` on `.gz` files finds nothing · `Permission denied` without `adm`/`sudo` · merging logs with different time zones |
+| **Use case** | Building an incident timeline: <code>cat auth.log syslog &#124; sort &#124; awk '$1 &gt;= "2026-11-13T03:00"'</code>. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man5/rsyslog.conf.5.html> · <https://manpages.ubuntu.com/manpages/noble/man1/zgrep.1.html> |
+
+### logrotate
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 (package logrotate, run daily by `logrotate.timer`); config `/etc/logrotate.conf` + `/etc/logrotate.d/*` |
+| **Description** | Rotates, compresses and expires log files; can run a command after rotation so the program reopens its file. |
+| **Syntax** | `logrotate [-d] [-v] [-f] [-s STATEFILE] CONFIG` |
+| **Parameters** | `-d` dry run (changes nothing) · `-v` verbose · `-f` force · `-s` private state file · directives `daily`/`weekly`/`size`, `rotate N`, `compress`, `delaycompress`, `missingok`, `notifempty`, `create MODE USER GROUP`, `copytruncate`, `postrotate … endscript`, `sharedscripts`, `su USER GROUP` |
+| **Example** | `sudo logrotate -d -f -s /srv/lab16/state/logrotate.state /srv/lab16/logrotate-lab16.conf` |
+| **Expected output** | `renaming /srv/lab16/app/app.log to /srv/lab16/app/app.log.1` · `creating new /srv/lab16/app/app.log mode = 0640 uid = 0 gid = 4` (captured) |
+| **Equivalent** | No built-in on Windows: event logs are size-limited (`wevtutil sl /ms:`); text logs need a scheduled script |
+| **Common errors** | *log does not need rotating* (not due / empty) · *skipping … because parent directory has insecure permissions* (add `su`) · program keeps writing to the renamed file (missing `postrotate` reload) |
+| **Use case** | Stopping an application log from filling `/var`; testing a new rule safely before it runs at night. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/logrotate.8.html> |
+
+### last / lastb
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux (util-linux); `lastb` needs root |
+| **Description** | Login history from `/var/log/wtmp` (`last`) and failed logins from `/var/log/btmp` (`lastb`), including reboots (`last reboot`). Day 17 covers authentication logs in depth. |
+| **Syntax** | <code>last [-n N] [-F] [-x] [USER&#124;reboot]</code> · `lastb [-n N]` |
+| **Parameters** | `-n 10` · `-F` full times · `-x` shutdowns and run-level changes |
+| **Example** | `last -n 5 -F` |
+| **Expected output** | `wtmp begins Sat Oct 24 14:05:10 2026` (captured on a host with no logins) |
+| **Equivalent** | `Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4624,4625}` (elevated) |
+| **Common errors** | Empty output on containers/WSL · `lastb` without `sudo` |
+| **Use case** | Quick check of who logged in and when the host rebooted. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/last.1.html> |

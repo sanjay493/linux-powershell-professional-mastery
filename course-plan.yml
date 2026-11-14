@@ -51,10 +51,10 @@ days:
      extras: ["scripts/linux/dns-check.sh", "scripts/powershell/DNS-Check.ps1"]}
   - {day: 14, module: module-3, release: 2026-11-13, status: published, title: "Ports, Sockets and Connections",
      extras: ["scripts/linux/port-monitor.sh", "scripts/powershell/Port-Monitor.ps1"]}
-  - {day: 15, module: module-3, release: 2026-11-14, status: planned, title: "Network Interfaces and Diagnostics",
+  - {day: 15, module: module-3, release: 2026-11-14, status: published, title: "Network Interfaces and Diagnostics",
      extras: ["scripts/linux/network-diagnostic.sh", "scripts/powershell/Network-Diagnostic.ps1",
               "docs/assessments/module-3-test.md", "pdf: Networking-Troubleshooting-Guide.pdf"]}
-  - {day: 16, module: module-4, release: 2026-11-14, status: planned, title: "System Logs",
+  - {day: 16, module: module-4, release: 2026-11-14, status: published, title: "System Logs",
      extras: ["scripts/linux/log-analyser.sh", "scripts/powershell/Log-Analyser.ps1"]}
   - {day: 17, module: module-4, release: 2026-11-15, status: planned, title: "Authentication and Security Monitoring",
      extras: ["scripts/linux/failed-login-report.sh", "scripts/powershell/Failed-Login-Report.ps1"]}

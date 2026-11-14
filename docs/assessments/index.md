@@ -24,6 +24,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 12 | [Connectivity Troubleshooting](../course/module-3/day-12.md#quiz) |
 | 13 | [DNS Troubleshooting](../course/module-3/day-13.md#quiz) |
 | 14 | [Ports, Sockets and Connections](../course/module-3/day-14.md#quiz) |
+| 15 | [Network Interfaces and Diagnostics](../course/module-3/day-15.md#quiz) |
+| 16 | [System Logs](../course/module-4/day-16.md#quiz) |
 
 ## Module tests
 
@@ -33,7 +35,7 @@ Each module test (20–25 questions: multiple choice, command-writing and a shor
 |---|---|---|
 | [Module 1 test](module-1-test.md) | Days 1–5 | Available |
 | [Module 2 test](module-2-test.md) | Days 6–10 | Available |
-| Module 3 test | Days 11–15 | 2026-11-14 22:00 IST |
+| [Module 3 test](module-3-test.md) | Days 11–15 | Available |
 | Module 4 test | Days 16–20 | 2026-11-16 22:00 IST |
 | Module 5 test | Days 21–25 | 2026-11-19 22:00 IST |
 | Module 6 test | Days 26–30 | 2026-11-21 22:00 IST |

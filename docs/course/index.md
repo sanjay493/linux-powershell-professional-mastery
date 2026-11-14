@@ -37,13 +37,13 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 | 12 | [Connectivity Troubleshooting](module-3/day-12.md) | `ping` `traceroute` `tracepath` `mtr` · `Test-Connection` `Test-NetConnection` `tracert` |
 | 13 | [DNS Troubleshooting](module-3/day-13.md) | `dig` `nslookup` `host` · `Resolve-DnsName` |
 | 14 | [Ports, Sockets and Connections](module-3/day-14.md) | `ss` `netstat` `lsof` · `Get-NetTCPConnection` `Get-NetUDPEndpoint` |
-| 15 | Network Interfaces and Diagnostics | `ip link` `ip neigh` `tcpdump` · `Get-NetAdapter` `Get-NetNeighbor` `pktmon` · Wireshark |
+| 15 | [Network Interfaces and Diagnostics](module-3/day-15.md) | `ip link` `ip neigh` `tcpdump` · `Get-NetAdapter` `Get-NetNeighbor` `pktmon` · Wireshark |
 
 ## Module 4 — [Security, Logs & Monitoring](module-4/index.md)
 
 | Day | Lesson | Key commands |
 |---|---|---|
-| 16 | System Logs | `journalctl` `dmesg` `/var/log` · `Get-WinEvent` `wevtutil` |
+| 16 | [System Logs](module-4/day-16.md) | `journalctl` `dmesg` `/var/log` · `Get-WinEvent` `wevtutil` |
 | 17 | Authentication and Security Monitoring | `last` `lastb` `who` · auth.log · Security log event IDs 4624/4625/4672 |
 | 18 | Firewall Management | `ufw` `nft` `iptables` · `Get-NetFirewallProfile` `Get-NetFirewallRule` |
 | 19 | System Security Auditing | `sudo -l` `find -perm` · `Get-ExecutionPolicy` `Get-MpComputerStatus` |

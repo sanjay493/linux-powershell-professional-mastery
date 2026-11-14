@@ -321,3 +321,52 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Address in use | `EADDRINUSE` (errno 98) | 10048 `WSAEADDRINUSE` | Also TIME-WAIT without `SO_REUSEADDR` |
 | Cross-platform API | — | `IPGlobalProperties.GetActiveTcpListeners()` | No PIDs |
 | Baseline + diff | `ss -Hltun` → file · `diff`/`comm` · `port-monitor.sh -s FILE` / `-b FILE` | `Export-Csv` + `Compare-Object` · `Port-Monitor.ps1 -SaveBaselinePath` / `-BaselinePath` | Same baseline file format |
+
+## Networking: interfaces and packet capture
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| List interfaces | `ip -br link` | `Get-NetAdapter` (`-Physical`, `-IncludeHidden`) | |
+| Admin state vs carrier | `UP` vs `LOWER_UP` / `NO-CARRIER` | `Disabled` vs `Disconnected` (`MediaConnectionState`) | Two different "up"s |
+| Interface details | `ip -d link show IF` | <code>Get-NetAdapter -Name IF &#124; Format-List *</code> | |
+| Speed / duplex / driver | `ethtool IF` · `ethtool -i IF` | `LinkSpeed`, `FullDuplex`, `DriverVersion` | Virtual NICs report arbitrary speeds |
+| Error / drop counters | `ip -s -s link show IF` · `/sys/class/net/IF/statistics/*` · `ethtool -S IF` | `Get-NetAdapterStatistics` | Two readings, compare the delta |
+| Link flaps | `cat /sys/class/net/IF/carrier_changes` · `ip -timestamp monitor link` | System log driver events · poll `Get-NetAdapter` | |
+| Driver settings / offloads | `ethtool -k IF` · `ethtool -K` (root) | `Get-NetAdapterAdvancedProperty` · `Set-…` (admin) | Changes reset the link |
+| IP MTU | `ip link show IF` (`mtu`) | `Get-NetIPInterface` (`NlMtu`) | |
+| MTU test | `ping -M do -s 1472 HOST` · `tracepath -n HOST` | `ping -f -l 1472 HOST` | Payload + 28 = IP size |
+| Neighbour cache | `ip neigh show` (`nud STATE`) | `Get-NetNeighbor` (`-State`) · `arp -a` | |
+| Static entries | `ip neigh show nud permanent` | `Get-NetNeighbor -State Permanent` | Multicast/broadcast entries are normal |
+| Delete one entry | `sudo ip neigh del IP dev IF` | `Remove-NetNeighbor -IPAddress IP -InterfaceAlias IF -WhatIf` | `flush` keeps PERMANENT entries |
+| Duplicate IP | `sudo arping -D -I IF IP` (exit 1) · `arping` shows two MACs | `Get-NetIPAddress` `AddressState Duplicate` · Tcpip event 4199 | |
+| Announce address | `sudo arping -U -I IF IP` | (automatic) | After fail-over |
+| Bounce adapter | `sudo ip link set dev IF down && sudo ip link set dev IF up` | `Restart-NetAdapter -Name IF -WhatIf` (admin) | Never over the same link |
+| Capture | `sudo tcpdump -i IF -n -s 128 -w f.pcap 'FILTER'` | `pktmon start --capture` · `netsh trace start capture=yes` | Authorised systems only |
+| Analyse | `tcpdump -n -e -r f.pcap` · `tshark -n -r f.pcap -Y '…'` | Wireshark after `pktmon etl2pcap` | Capture vs display filters |
+| Cross-platform API | — | `[System.Net.NetworkInformation.NetworkInterface]` | Works in PS 7 on Linux |
+| Course script | `network-diagnostic.sh -t HOST -p PORT` | `Network-Diagnostic.ps1 -Target HOST -Port PORT` | Exit 3 = a check failed |
+
+## Logs
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Recent messages | `journalctl -n 50 --no-pager` | `Get-WinEvent -LogName System -MaxEvents 50` | |
+| Errors and worse | `journalctl -p err` (0–3) | `Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2}` | `Level=2` alone excludes Critical |
+| Time window | `journalctl --since "2026-11-13 03:00" --until "03:30"` | `-FilterHashtable @{…; StartTime=…; EndTime=…}` | Convert to UTC before comparing sources |
+| By program / source | `journalctl -t sudo` · `journalctl -u ssh` | `-FilterHashtable @{LogName='System'; ProviderName='Service Control Manager'}` | |
+| Previous boot / unexpected restart | `journalctl -b -1` · `--list-boots` | Events 41, 6008 (unexpected), 1074 + 6006 (planned), 6005 (start) | `-b -1` needs a persistent journal |
+| Kernel messages | `sudo dmesg -T` · `journalctl -k` | System log, `Microsoft-Windows-Kernel-*` providers | `dmesg -T` times approximate |
+| Structured output | `journalctl -o json` / `-o verbose` | Objects · `([xml]$e.ToXml()).Event.EventData.Data` | |
+| Real writer of a message | `_PID`, `_COMM`, `_UID` (trusted fields) | `ProcessId`, `UserId`; Security log written only by LSA | Tags and sources can be faked |
+| Write a test message | `logger -t TAG -p local0.err "…"` · `systemd-cat -t TAG` | `eventcreate /T ERROR /ID 900 /L APPLICATION /SO Lab16 /D "…"` (elevated) · `Write-EventLog` (5.1 only) | |
+| List sources / logs | `journalctl -F SYSLOG_IDENTIFIER` · `ls /var/log` | `Get-WinEvent -ListLog *` · `-ListProvider *` | |
+| Search rotated text logs | `zgrep -h PATTERN /var/log/auth.log*` | `Select-String` (plain files; decompress `.gz` first) | |
+| Timeline from several files | <code>cat auth.log syslog &#124; sort &#124; awk '$1 &gt;= "…"'</code> | <code>Get-Content a, b &#124; Sort-Object &#124; Where-Object { $_ -ge '…' }</code> | RFC 3339 timestamps sort as text |
+| Size and retention | `journalctl --disk-usage` · `SystemMaxUse=` · logrotate | `Get-WinEvent -ListLog X` (`MaximumSizeInBytes`, `LogMode`) · `wevtutil gl` · `Limit-EventLog` (5.1) | |
+| Rotate text logs | `logrotate -d` (dry run) · `logrotate -f -s STATE CONF` | No built-in (application or scheduled script) | |
+| Export evidence | `journalctl -o export > f` · `cp -p` + `sha256sum` | `wevtutil epl LOG FILE.evtx` + `Get-FileHash` | Analyse copies |
+| Read an export | `journalctl --file FILE` | `Get-WinEvent -Path FILE.evtx` | |
+| Clear / vacuum (destructive) | `journalctl --vacuum-time=…` | `wevtutil cl LOG /bu:FILE` · `Clear-EventLog` (5.1) | Logged as 104 / 1102 on Windows |
+| Legacy cmdlet | — | `Get-EventLog` (**5.1 only**) | Port to `Get-WinEvent` |
+| PowerShell 7 on Linux | <code>journalctl -o json &#124; ForEach-Object { $_ &#124; ConvertFrom-Json }</code> | — | No `Get-WinEvent` on Linux |
+| Daily summary script | `log-analyser.sh -s 24 -n 10 -c 50` | `Log-Analyser.ps1 -Hours 24 -Top 10 -MaxErrors 50` | Exit 3 = too many errors |

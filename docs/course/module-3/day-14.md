@@ -1378,4 +1378,4 @@ netsh int ipv4 show dynamicport tcp                             # ephemeral rang
 
 ---
 
-**Previous:** [Day 13: DNS Troubleshooting](day-13.md) · **Next:** Day 15: Network Interfaces and Diagnostics (see the [release schedule](../schedule.md))
+**Previous:** [Day 13: DNS Troubleshooting](day-13.md) · **Next:** [Day 15: Network Interfaces and Diagnostics](day-15.md)

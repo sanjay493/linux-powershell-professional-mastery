@@ -12,7 +12,7 @@ All PDFs are **generated automatically** from this website's sources by GitHub A
 | [:material-file-pdf-box: Linux Command Reference & Cheat Sheet](pdf/Linux-Command-Cheat-Sheet.pdf) | Linux command reference and Bash ↔ PowerShell table | Available, and grows nightly |
 | [:material-file-pdf-box: PowerShell Command Reference & Cheat Sheet](pdf/PowerShell-Command-Cheat-Sheet.pdf) | PowerShell cmdlet reference and comparison table | Available, and grows nightly |
 | [:material-file-pdf-box: Practical Lab Workbook](pdf/Practical-Lab-Workbook.pdf) | Lab safety rules and every published lab with solutions | Available, and grows nightly |
-| Networking & Troubleshooting Guide | Module 3 (Days 11–15) and the Network Analyst pathway | Released with Day 15 (2026-11-14 22:00 IST) |
+| [:material-file-pdf-box: Networking & Troubleshooting Guide](pdf/Networking-Troubleshooting-Guide.pdf) | Module 3 (Days 11–15) and the Network Analyst pathway | Available |
 | Cybersecurity Command Reference | Module 4 (Days 16–20) and the SOC Analyst pathway | Released with Day 20 (2026-11-16 22:00 IST) |
 | Final Assessment & Answer Key | Final written and practical examination with answer key | Released with Day 30 (2026-11-21 22:00 IST) |
 

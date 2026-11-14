@@ -1410,3 +1410,217 @@ IP configuration (Day 11) and connectivity testing (Day 12). The `Net*` cmdlets 
 | **Common errors** | Expecting owners (use `Get-NetTCPConnection` on Windows or `ss -p` on Linux) |
 | **Use case** | Portable listener baselines (`Port-Monitor.ps1` on Linux/macOS). |
 | **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.net.networkinformation.ipglobalproperties> |
+
+## Interfaces & Packet Capture
+
+### Get-NetAdapter
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows PowerShell 5.1 and PowerShell 7 on Windows (NetAdapter module) — **Windows only** |
+| **Description** | Lists network adapters with `Status` (`Up`, `Disconnected`, `Disabled`, `Not Present`), `MediaConnectionState`, `LinkSpeed`, `FullDuplex`, `MtuSize`, `MacAddress`, `ifIndex`, driver details. |
+| **Syntax** | <code>Get-NetAdapter [[-Name] &lt;String[]&gt;] [-InterfaceIndex &lt;UInt32[]&gt;] [-Physical] [-IncludeHidden]</code> |
+| **Parameters** | `-Physical` hardware only · `-IncludeHidden` hidden/virtual adapters · `-Name Ethernet` |
+| **Example** | <code>Get-NetAdapter &#124; Format-Table Name, Status, LinkSpeed, MacAddress, ifIndex</code> |
+| **Expected output** | `Ethernet  Disconnected  0 bps  8C-04-BA-AB-CD-EF  12` (example) |
+| **Equivalent** | `ip -br link` · `ethtool IF` |
+| **Common errors** | Not recognised in PowerShell 7 on Linux/macOS · confusing `Disconnected` (no cable) with `Disabled` (switched off) |
+| **Use case** | Help-desk check: link speed fell back to 100 Mbps → cable. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netadapter/get-netadapter> |
+
+### Get-NetAdapterStatistics
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7 on Windows — **Windows only** |
+| **Description** | Per-adapter counters: bytes, unicast/multicast packets, `ReceivedPacketErrors`, `ReceivedDiscardedPackets`, `OutboundPacketErrors`, `OutboundDiscardedPackets`. |
+| **Syntax** | <code>Get-NetAdapterStatistics [[-Name] &lt;String[]&gt;] [-IncludeHidden]</code> |
+| **Parameters** | `-Name` adapter · compare two readings over time |
+| **Example** | <code>Get-NetAdapterStatistics -Name Ethernet &#124; Format-List *Errors, *Discarded*</code> |
+| **Expected output** | `ReceivedPacketErrors : 0` · `ReceivedDiscardedPackets : 112` (example) |
+| **Equivalent** | `ip -s -s link show IF` · `/sys/class/net/IF/statistics/*` |
+| **Common errors** | Judging from one reading (counters are cumulative since the driver started) |
+| **Use case** | Proving errors grow while users complain. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netadapter/get-netadapterstatistics> |
+
+### Get-NetAdapterAdvancedProperty / Set-NetAdapterAdvancedProperty
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7 on Windows — **Windows only**; `Set-` needs **admin** and resets the adapter |
+| **Description** | Driver settings such as *Speed & Duplex* (`*SpeedDuplex`), *Jumbo Packet* (`*JumboPacket`), large send offload (`*LsoV2IPv4`). Display names are driver-specific; registry keywords are standard. |
+| **Syntax** | <code>Get-NetAdapterAdvancedProperty [[-Name] &lt;String[]&gt;] [-DisplayName &lt;String[]&gt;] [-RegistryKeyword &lt;String[]&gt;]</code> · <code>Set-NetAdapterAdvancedProperty -Name &lt;String[]&gt; -RegistryKeyword &lt;String[]&gt; -RegistryValue &lt;String[]&gt; [-NoRestart] [-WhatIf]</code> |
+| **Parameters** | `-RegistryKeyword '*JumboPacket'` · `-NoRestart` apply later · `-WhatIf` preview |
+| **Example** | `Get-NetAdapterAdvancedProperty -Name Ethernet -RegistryKeyword '*JumboPacket'` |
+| **Expected output** | `Ethernet  Jumbo Packet  Disabled  *JumboPacket  {1514}` (example) |
+| **Equivalent** | `ethtool IF` · `ethtool -k IF` · `ip link set dev IF mtu 9000` |
+| **Common errors** | Changing settings over RDP (link resets) · jumbo frames on the host but not on the switch |
+| **Use case** | Checking a speed/duplex mismatch or jumbo-frame configuration. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netadapter/get-netadapteradvancedproperty> |
+
+### Restart-NetAdapter / Disable-NetAdapter / Enable-NetAdapter
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7 on Windows — **Windows only**, **admin** |
+| **Description** | Bounce, switch off or switch on an adapter. Cuts every session using that adapter. |
+| **Syntax** | <code>Restart-NetAdapter [-Name] &lt;String[]&gt; [-WhatIf] [-Confirm]</code> (same for `Disable-`/`Enable-`) |
+| **Parameters** | `-WhatIf` preview · `-Confirm` prompt |
+| **Example** | `Restart-NetAdapter -Name Ethernet -WhatIf` |
+| **Expected output** | `What if: Restart-NetAdapter -Name Ethernet` (example) |
+| **Equivalent** | `sudo ip link set dev IF down/up` |
+| **Common errors** | Running it remotely over the same adapter · not elevated (*Access denied*) |
+| **Use case** | Recovering from a hung driver from the console. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netadapter/restart-netadapter> |
+
+### Get-NetNeighbor / Remove-NetNeighbor (deeper)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7 on Windows (NetTCPIP) — **Windows only**; `Remove-` needs **admin** |
+| **Description** | Neighbour cache with `State` `Incomplete`, `Probe`, `Delay`, `Stale`, `Reachable`, `Unreachable`, `Permanent`; delete one entry. Duplicate IPv4 addresses appear as `AddressState Duplicate` in `Get-NetIPAddress` and Tcpip event 4199. |
+| **Syntax** | <code>Get-NetNeighbor [[-IPAddress] &lt;String[]&gt;] [-InterfaceAlias &lt;String[]&gt;] [-State &lt;State[]&gt;]</code> · <code>Remove-NetNeighbor -IPAddress &lt;String[]&gt; -InterfaceAlias &lt;String[]&gt; [-WhatIf]</code> |
+| **Parameters** | `-State Permanent` static entries · `-AddressFamily IPv4` · `-WhatIf` |
+| **Example** | `Get-NetNeighbor -State Permanent -AddressFamily IPv4` |
+| **Expected output** | `10.15.0.1  02-15-00-00-00-99  Permanent` (example) |
+| **Equivalent** | `ip neigh show nud permanent` · `ip neigh del` · `arping -D` |
+| **Common errors** | Treating multicast/broadcast `Permanent` entries as a problem · deleting without a backup |
+| **Use case** | A wrong static gateway entry after a router replacement. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netneighbor> · <https://learn.microsoft.com/en-us/powershell/module/nettcpip/remove-netneighbor> |
+
+### Get-NetIPInterface (NlMtu) and ping -f -l
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7 on Windows — **Windows only** (`ping.exe` in any shell) |
+| **Description** | `NlMtu` is the IP MTU Windows uses per interface; `ping -f -l N` sends N bytes with don't fragment. |
+| **Syntax** | <code>Get-NetIPInterface [-InterfaceAlias &lt;String[]&gt;] [-AddressFamily IPv4&#124;IPv6]</code> · `ping -f -l <size> <host>` |
+| **Parameters** | `NlMtu` property · `-f` don't fragment · `-l 1472` = 1500-byte packet |
+| **Example** | `ping -f -l 1472 -n 2 10.15.0.20` |
+| **Expected output** | `Request timed out.` (black hole) or `Packet needs to be fragmented but DF set.` (router reports MTU) (example) |
+| **Equivalent** | `ping -M do -s 1472 HOST` · `ip link show` (`mtu`) |
+| **Common errors** | Testing with `-l 1500` (that is a 1528-byte packet) |
+| **Use case** | VPN works for chat but not for file shares. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-netipinterface> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/ping> |
+
+### pktmon / netsh trace (native capture)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows 10 2004+ / Windows 11 (`pktmon`), any Windows (`netsh trace`) — **admin** |
+| **Description** | Built-in packet capture. `pktmon` filters packets, counts drops per stack component and converts ETL to pcapng; `netsh trace` writes an ETW trace (ETL + diagnostic CAB). |
+| **Syntax** | `pktmon filter add [NAME] [-i IP] [-p PORT] [-t PROTO]` · `pktmon start --capture [--pkt-size N] [--file-name F]` · `pktmon counters` · `pktmon stop` · `pktmon etl2pcap F.etl --out F.pcapng` · `pktmon filter remove` · `netsh trace start capture=yes tracefile=F.etl maxsize=MB` · `netsh trace stop` |
+| **Parameters** | `--pkt-size 128` headers only · `filter remove` after every capture |
+| **Example** | `pktmon filter add Web -i 10.15.0.20 -p 8080; pktmon start --capture --pkt-size 128` |
+| **Expected output** | `Filter added.` … `Converted file : C:\Users\student\lab15\web.pcapng` (example) |
+| **Equivalent** | `tcpdump -i IF -n -s 128 -w file.pcap 'host … and port …'` |
+| **Common errors** | Not elevated · leaving filters/traces running · expecting `netsh trace` output to open directly in Wireshark (convert first) |
+| **Use case** | Capturing on a Windows server without installing Wireshark. Capture only where authorised. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/networking/technologies/pktmon/pktmon> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/pktmon> |
+
+### .NET NetworkInterface statistics (cross-platform)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7, **all OS** |
+| **Description** | `[System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()` returns name, type, `OperationalStatus`, `Speed`, MAC and `GetIPStatistics()` counters; some statistics are unsupported on Linux/macOS. |
+| **Syntax** | <code>[System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces()</code> · `$nic.GetIPStatistics()` · `$nic.GetIPProperties().GetIPv4Properties().Mtu` |
+| **Parameters** | `IncomingPacketsWithErrors`, `IncomingPacketsDiscarded`, `OutgoingPacketsWithErrors`, `OutgoingPacketsDiscarded` |
+| **Example** | <code>[System.Net.NetworkInformation.NetworkInterface]::GetAllNetworkInterfaces() &#124; Select-Object Name, OperationalStatus, Speed</code> |
+| **Expected output** | `eth0  Up  10000000000` (example, PowerShell 7 on Ubuntu) |
+| **Equivalent** | `ip -s link` · `Get-NetAdapterStatistics` |
+| **Common errors** | `PlatformNotSupportedException` reading some properties on Linux · `Speed` -1 when unknown |
+| **Use case** | Portable interface checks in scripts (`Network-Diagnostic.ps1`). |
+| **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.net.networkinformation.networkinterface> |
+
+## Logs
+
+### Get-WinEvent -ListLog / -LogName
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (Microsoft.PowerShell.Diagnostics). Security log: elevated or *Event Log Readers* |
+| **Description** | Lists event logs with their configuration (`RecordCount`, `FileSize`, `MaximumSizeInBytes`, `LogMode`, `IsEnabled`) and reads events from any classic or *Applications and Services* log, newest first. |
+| **Syntax** | <code>Get-WinEvent [-ListLog] &lt;String[]&gt;</code> · <code>Get-WinEvent [[-LogName] &lt;String[]&gt;] [-MaxEvents &lt;Int64&gt;] [-FilterXPath &lt;String&gt;] [-Oldest] [-ComputerName &lt;String&gt;]</code> |
+| **Parameters** | `-ListLog *` · `-LogName System` · `-MaxEvents 20` · `-FilterXPath "*[System[(EventID=6008)]]"` · `-Oldest` · `-ComputerName SRV01` |
+| **Example** | `Get-WinEvent -ListLog System, Application, Setup` |
+| **Expected output** | `System   28411   20971520   Circular   True` (example) |
+| **Equivalent** | `journalctl -n 50` · `journalctl -F SYSLOG_IDENTIFIER` · `ls /var/log` |
+| **Common errors** | *Attempted to perform an unauthorized operation* (Security log, not elevated) · *not recognized* in PowerShell 7 on Linux · *The RPC server is unavailable* with `-ComputerName` |
+| **Use case** | Checking how much history a server keeps before an investigation. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent> |
+
+### Get-WinEvent -FilterHashtable / -Path
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · Windows only |
+| **Description** | Server-side filtering of events by log, provider, ID, level, time and event data; also reads exported `.evtx` files. Much faster than piping into `Where-Object`. |
+| **Syntax** | <code>Get-WinEvent -FilterHashtable @{ LogName=…; ProviderName=…; Id=…; Level=…; StartTime=…; EndTime=…; Path=…; Data=… } [-MaxEvents N]</code> · <code>Get-WinEvent -Path &lt;String[]&gt;</code> |
+| **Parameters** | Levels `1` Critical, `2` Error, `3` Warning, `4` Information, `5` Verbose (`0` LogAlways for Security audits) · named data keys such as `TargetUserName` · `-ErrorAction SilentlyContinue` · `([xml]$e.ToXml()).Event.EventData.Data` for fields |
+| **Example** | `Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 6005, 6006, 6008, 41, 1074 } -MaxEvents 10` |
+| **Expected output** | `13/11/2026 13:11:58 6008 EventLog The previous system shutdown at 08:42:10 on 13/11/2026 was unexpected.` (example) |
+| **Equivalent** | `journalctl -p err --since …` · `journalctl -b -1` · `journalctl --file FILE` |
+| **Common errors** | *No events were found that match the specified selection criteria* (`NoMatchingEventsFound`) — often good news · `Level = 2` excludes Critical (use `1, 2`) · local-time `TimeCreated` |
+| **Use case** | Boot/shutdown history (41, 1074, 6005, 6006, 6008), new services (7045), cleared logs (104, 1102), reading an evidence export. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/scripting/samples/creating-get-winevent-queries-with-filterhashtable> |
+
+### Get-EventLog (Windows PowerShell 5.1 only)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **5.1 only** — removed in PowerShell 6+ (also `Write-EventLog`, `New-EventLog`, `Remove-EventLog`, `Limit-EventLog`, `Clear-EventLog`, `Show-EventLog`) |
+| **Description** | Legacy reader for the classic logs (System, Application, Security…). Still common in old scripts. |
+| **Syntax** | <code>Get-EventLog [-LogName] &lt;String&gt; [-Newest &lt;Int32&gt;] [-After &lt;DateTime&gt;] [-Before &lt;DateTime&gt;] [-EntryType &lt;String[]&gt;] [-Source &lt;String[]&gt;] [-InstanceId &lt;Int64[]&gt;]</code> |
+| **Parameters** | `-EntryType Error, Warning` · `-Newest 20` · `-Source 'Application Error'` · `-After (Get-Date).AddDays(-7)` |
+| **Example** | `Get-EventLog -LogName System -EntryType Error -Newest 10` |
+| **Expected output** | `Index Time EntryType Source InstanceId Message` table (example) |
+| **Equivalent** | `Get-WinEvent -FilterHashtable @{LogName='System'; Level=2}` (5.1 and 7) · `journalctl -p err` |
+| **Common errors** | *The term 'Get-EventLog' is not recognized* in PowerShell 7 · cannot read *Applications and Services* logs |
+| **Use case** | Reading old runbooks; port them to `Get-WinEvent`. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-eventlog?view=powershell-5.1> |
+
+### wevtutil (native)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (any shell). Security, `sl`, `cl` need elevation |
+| **Description** | Lists logs, shows configuration, queries events, **exports** logs to `.evtx` (evidence), sets sizes, and clears logs (destructive, logged as 104/1102). |
+| **Syntax** | <code>wevtutil el &#124; gl LOG &#124; gli LOG &#124; qe LOG [/q:XPATH] [/c:N] [/rd:true] [/f:text] &#124; epl LOG FILE &#124; sl LOG /ms:BYTES &#124; cl LOG [/bu:FILE]</code> |
+| **Parameters** | `qe System /c:5 /rd:true /f:text` newest five as text · `epl System C:\IR\System.evtx` export · `cl … /bu:` backup before clearing (never in an investigation) |
+| **Example** | `wevtutil epl Application C:\IR\Application-lab16.evtx` |
+| **Expected output** | No output on success; `Get-WinEvent -Path` reads the file (example) |
+| **Equivalent** | `journalctl -o export > file` · `cp -p /var/log/auth.log` + `sha256sum` |
+| **Common errors** | *Access is denied* (not elevated) · forgetting the colon in options (`/c:5`) |
+| **Use case** | Collecting event logs from a suspect host for offline analysis. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil> |
+
+### eventcreate / New-WinEvent (writing test events)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | `eventcreate.exe`: Windows, elevated · `New-WinEvent`: 5.1 and 7 on Windows (manifest providers only) · `Write-EventLog`: 5.1 only |
+| **Description** | Writes custom events, for testing alerts and for scripts. `eventcreate` registers a source in Application or System and accepts IDs 1–1000. |
+| **Syntax** | <code>eventcreate /T ERROR&#124;WARNING&#124;INFORMATION /ID N /L APPLICATION&#124;SYSTEM /SO SOURCE /D "TEXT"</code> · <code>New-WinEvent -ProviderName &lt;String&gt; -Id &lt;Int32&gt; [-Payload &lt;Object[]&gt;]</code> |
+| **Parameters** | `/T` type · `/ID` 1–1000 · `/L` log · `/SO` source · `/D` description |
+| **Example** | `eventcreate /T ERROR /ID 902 /L APPLICATION /SO Lab16 /D "write failed: There is not enough space on the disk"` |
+| **Expected output** | `SUCCESS: An event of type 'ERROR' was created in the 'APPLICATION' log with 'Lab16' as the source.` (example) |
+| **Equivalent** | `logger -t TAG -p local0.err "…"` · `systemd-cat` |
+| **Common errors** | *ERROR: Access denied* (not elevated) · *Source parameter is used to identify custom applications/scripts only* (source exists from another program) |
+| **Use case** | Testing that a monitoring rule fires on Application error events. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/eventcreate> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/new-winevent> |
+
+### journalctl JSON in PowerShell 7 (Linux)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 7.x on Linux (no event-log cmdlets exist there) |
+| **Description** | `journalctl -o json` prints one JSON object per line; `ConvertFrom-Json` turns each into an object. All values are strings. |
+| **Syntax** | <code>journalctl -o json --no-pager [FILTERS] &#124; ForEach-Object { $_ &#124; ConvertFrom-Json }</code> |
+| **Parameters** | `__REALTIME_TIMESTAMP` µs since 1970 (UTC) → `[DateTimeOffset]::FromUnixTimeMilliseconds([long]$_.__REALTIME_TIMESTAMP / 1000)` · `PRIORITY`, `SYSLOG_IDENTIFIER`, `MESSAGE`, `_PID`, `_COMM` |
+| **Example** | <code>journalctl -t lab16-drill -o json --no-pager &#124; ForEach-Object { $_ &#124; ConvertFrom-Json } &#124; Select-Object PRIORITY, MESSAGE</code> |
+| **Expected output** | `3  drill: backup job failed: destination /mnt/backup not mounted` (example, from the captured journal) |
+| **Equivalent** | `Get-WinEvent` on Windows |
+| **Common errors** | Comparing `PRIORITY` as a number without casting · no `sudo` → own user journal only |
+| **Use case** | Cross-platform log summaries (the course's `Log-Analyser.ps1` uses this on Linux). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/journalctl.1.html> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertfrom-json> |

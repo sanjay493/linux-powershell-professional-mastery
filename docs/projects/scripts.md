@@ -27,8 +27,8 @@ Scripts live in the repository under `scripts/linux/` and `scripts/powershell/`.
 | 3 | `disk-monitor.sh` | `Disk-Monitor.ps1` | Filesystem usage with warning/critical thresholds | **Day 09 (available)** |
 | 4 | `dns-check.sh` | `DNS-Check.ps1` | Forward/reverse lookups across resolvers | **Day 13 (available)** |
 | 5 | `port-monitor.sh` | `Port-Monitor.ps1` | Listening ports and owning processes, baseline diff | **Day 14 (available)** |
-| 6 | `network-diagnostic.sh` | `Network-Diagnostic.ps1` | Layered connectivity diagnosis | Day 15 |
-| 7 | `log-analyser.sh` | `Log-Analyser.ps1` | Error/warning summaries from system logs | Day 16 |
+| 6 | `network-diagnostic.sh` | `Network-Diagnostic.ps1` | Layered connectivity diagnosis | **Day 15 (available)** |
+| 7 | `log-analyser.sh` | `Log-Analyser.ps1` | Error/warning summaries from system logs | **Day 16 (available)** |
 | 8 | `failed-login-report.sh` | `Failed-Login-Report.ps1` | Failed authentication summary by account and source | Day 17 |
 | 9 | `system-health.sh` | `System-Health.ps1` | Thresholded health check for scheduling | Day 25 |
 | 10 | `daily-report.sh` | `Daily-Report.ps1` | Combined daily text and CSV report | Day 29 |
@@ -666,3 +666,286 @@ NEW   tcp 127.0.0.1 44444
 |---|---|---|
 | Executed | 2026-11-13 in an Ubuntu 24.04.5 container (Bash 5.2.21, iproute2 6.1.0 `ss`), on the container host and inside the Lab 14 namespaces: no arguments, `-o`, `-f csv`, `-t`, `-u`, `-e -a`, `-c`, `-s` + `-b` with a new listener (exit 3) and with a removed listener (GONE, exit 0), non-root run as `nobody` (owners `n/a`), the `netstat` and `/proc/net` fallbacks (PATH without `ss`/`netstat`), invalid options/format/ports/`-b` path/extra argument (exit 1), unwritable `-o` and `-s` (exit 2). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (PowerShell could not be installed on the release host). Cmdlet syntax and `-State` values checked against the MicrosoftDocs/windows-powershell-docs source (NetTCPIP); .NET `IPGlobalProperties` usage reviewed from the .NET API documentation. CI parses it, runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (no arguments and `-OutputPath`) and runs PSScriptAnalyzer |
 | Static analysis | `bash -n` and ShellCheck 0.9.0 (no findings at any severity, `-S style`) | PSScriptAnalyzer in CI (Error and Warning severities) |
+
+## network-diagnostic.sh / Network-Diagnostic.ps1
+
+**Purpose:** a read-only, **layered** diagnosis of one network interface, bottom-up — link state and carrier, MTU/MAC, speed/duplex, addresses, error and drop counters, default route, gateway neighbour (ARP) state and ping, DNS configuration, an optional DNS lookup and an optional TCP port test. Every check prints one line with `OK`, `WARN`, `FAIL` or `n/a` and a short explanation; the first `FAIL` from the top is usually the layer to fix. The scripts exit with code **3** when any check fails, so they can drive cron, Task Scheduler or a monitoring agent. Taught in [Day 15](../course/module-3/day-15.md) and used in [Lab 15](../labs/lab-15.md).
+
+The two scripts run the same checks with the same names, so their reports can be compared line by line. A gateway that does not answer ping while its ARP entry is `REACHABLE`/`STALE` is reported as `WARN`, not `FAIL`: many routers and cloud gateways drop ICMP on purpose.
+
+### Prerequisites
+
+| Linux | Windows |
+|---|---|
+| Any Linux with iproute2 `ip` and `/sys/class/net` (Ubuntu 24.04 tested). Bash 4+, `awk`, coreutils `timeout`. Optional: `ethtool` (speed/duplex when `/sys` does not report it), `ping` (iputils-ping), `getent`. No root needed; checks whose tool or permission is missing are `n/a`. The TCP test uses Bash's `/dev/tcp` with a 5-second timeout. | Windows 11, Windows PowerShell 5.1 or PowerShell 7. No admin: NetAdapter (`Get-NetAdapter`, `Get-NetAdapterStatistics`), NetTCPIP (`Get-NetIPAddress`, `Get-NetRoute`, `Get-NetNeighbor`) and DnsClient (`Get-DnsClientServerAddress`). Ping, DNS lookup and the TCP test use .NET (`Ping`, `Dns.GetHostAddresses`, `TcpClient`) on every OS. In PowerShell 7 on Linux/macOS the script uses `System.Net.NetworkInformation.NetworkInterface`; ARP state and carrier are then `n/a`. |
+
+### Options
+
+| Bash | PowerShell | Default | Meaning |
+|---|---|---|---|
+| `-i IFACE` | `-InterfaceAlias NAME` | default-route interface | Interface to check; without a default route, the first non-loopback interface that is up |
+| `-t HOST` | `-Target HOST` | — | Also test a TCP connection to HOST |
+| `-p PORT` | `-Port PORT` | 443 | TCP port for `-t` / `-Target` (requires it) |
+| `-n NAME` | `-DnsName NAME` | — | Also resolve NAME with the system resolver (hosts file + DNS) |
+| `-e MAXERR` | `-MaxErrors N` | 0 | Errors + drops allowed: errors above the limit = `FAIL`, drops alone = `WARN` |
+| <code>-f text&#124;csv</code> | <code>-Format Text&#124;Csv&#124;Json</code> | text | Output format |
+| `-o DIR` | `-OutputPath DIR` | — | Also save a timestamped report file |
+| `-h` | `Get-Help .\Network-Diagnostic.ps1 -Full` | — | Help |
+
+Exit codes: `0` OK (warnings allowed) · `1` invalid arguments (unknown interface, bad port, `-p` without `-t`) · `2` output folder cannot be created or written · `3` at least one check failed. Checks, in order: `link-state`, `carrier`, `mtu-mac`, `speed-duplex`, `addresses`, `counters`, `default-route`, `gateway-neighbour`, `gateway-ping`, `dns-config`, `dns-lookup` (with `-n`), `tcp-connect` (with `-t`).
+
+Drops are not errors: Linux counts frames for protocols nobody listens to in `rx_dropped`, and Windows counts filtered packets as discards, so a healthy host can show a few. Interface counters are totals **since the interface came up**; compare two runs a few minutes apart (or `ip -s link`) to see whether they are still growing.
+
+### How to run
+
+```bash
+cd scripts/linux
+bash network-diagnostic.sh                                   # default-route interface
+bash network-diagnostic.sh -i enp0s3 -n www.example.com -t www.example.com -p 443
+bash network-diagnostic.sh -e 100; echo "exit: $?"           # tolerate up to 100 errors+drops
+bash network-diagnostic.sh -f csv -o ~/lpm-lab/reports
+```
+
+```powershell
+Set-Location scripts\powershell
+.\Network-Diagnostic.ps1
+.\Network-Diagnostic.ps1 -InterfaceAlias 'Ethernet' -DnsName www.example.com -Target www.example.com -Port 443
+.\Network-Diagnostic.ps1 -MaxErrors 100 -Format Json -OutputPath $HOME\lpm-lab\reports
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Network-Diagnostic.ps1; "exit: $LASTEXITCODE"
+```
+
+### Sample output (Bash; captured on 2026-11-14 in an Ubuntu 24.04.5 container inside a test network namespace whose default route points to a gateway address that does not exist; host renamed)
+
+```text
+==============================================
+ Network Diagnostic Report
+==============================================
+Report time (UTC)    : 2026-11-14T16:45:19Z
+Host name            : ubuntu-lab
+Interface            : ndt-c (default route)
+Error limit (-e)     : 0
+Status               : FAIL (2 failed, 1 warnings)
+
+--- Checks (bottom-up: link -> IP -> gateway -> DNS -> port) ---
+CHECK              STATUS DETAIL
+link-state         OK    admin up, operstate up
+carrier            OK    carrier detected
+mtu-mac            OK    MTU 1500, MAC 2e:56:6a:20:53:64
+speed-duplex       OK    10000 Mb/s, duplex full
+addresses          OK    IPv4 10.15.9.10/24; IPv6 global none
+counters           WARN  rx_errors 0, tx_errors 0, rx_dropped 0, tx_dropped 2 (since the interface came up; limit 0)
+default-route      OK    via 10.15.9.254 dev ndt-c
+gateway-neighbour  FAIL  10.15.9.254 is INCOMPLETE: no ARP/ND reply (wrong gateway, VLAN or link problem)
+gateway-ping       FAIL  no reply from 10.15.9.254
+dns-config         OK    nameserver(s) in /etc/resolv.conf: 8.8.8.8 8.8.4.4
+dns-lookup         OK    localhost -> 127.0.0.1
+tcp-connect        OK    10.15.9.1:8443 open (4 ms)
+```
+
+The command was `network-diagnostic.sh -t 10.15.9.1 -p 8443 -n localhost` and the exit code was `3`. The host could still reach its own subnet (the TCP test to `10.15.9.1` succeeded), but the gateway `10.15.9.254` never answered ARP: the classic *wrong default gateway* fault. The veth test interface reports a nominal 10000 Mb/s; real NICs report their negotiated speed. Other captured results in the same namespaces: peer interface down → `link-state FAIL … operstate down` and `carrier FAIL`; interface administratively down → `link-state FAIL admin down … (fix: sudo ip link set ndt-c up)`; no default route → `default-route FAIL`; closed port → `tcp-connect FAIL … connection refused`; port dropped by a firewall rule → `tcp-connect FAIL … timed out after 5 s`; absent host on the local subnet → `tcp-connect FAIL … no route to host`.
+
+### Sample output (PowerShell; **example** of the layout on Windows — illustrative values, not captured on Windows)
+
+```text
+==============================================
+ Network Diagnostic Report
+==============================================
+Report time (UTC)    : 2026-11-14T17:05:41Z
+Computer name        : WIN11-LAB
+Interface            : Ethernet (default route)
+Data source          : NetAdapter / NetTCPIP / DnsClient cmdlets
+Error limit          : 0
+Status               : OK (0 failed, 0 warnings)
+PowerShell           : 5.1.26100.9168 (Desktop)
+
+--- Checks (bottom-up: link -> IP -> gateway -> DNS -> port) ---
+CHECK              STATUS DETAIL
+link-state         OK    admin Up, status Up
+carrier            OK    media connected
+mtu-mac            OK    MTU 1500, MAC 00-15-5D-01-0A-23
+speed-duplex       OK    1 Gbps, full duplex
+addresses          OK    IPv4 192.168.1.50/24; IPv6 global none
+counters           OK    rx_errors 0, tx_errors 0, rx_discards 0, tx_discards 0 (since the adapter started; limit 0)
+default-route      OK    via 192.168.1.1 on 'Ethernet'
+gateway-neighbour  OK    192.168.1.1 is Reachable (MAC 00-11-22-33-44-55)
+gateway-ping       OK    2 of 2 replies, avg rtt 1 ms
+dns-config         OK    DNS server(s) on 'Ethernet': 192.168.1.1
+dns-lookup         OK    www.example.com -> 93.184.215.14
+tcp-connect        OK    www.example.com:443 open (38 ms)
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `interface FAIL no default route and no non-loopback interface is UP` | Every interface is down or unconfigured; check `ip -br link` / `Get-NetAdapter` and bring the right one up |
+| `interface 'X' does not exist` (exit 1) | Use the exact name from `ip -br link` (`enp0s3`, `ens33`, `eth0`) or `Get-NetAdapter` (`Ethernet`, `Wi-Fi`) |
+| `counters WARN` on a healthy host | Drops include harmless discards; compare two runs or raise `-e` / `-MaxErrors`; investigate if **errors** (CRC, frame) grow |
+| `speed-duplex n/a` | Virtual NICs, Wi-Fi and some drivers do not report speed; on Linux install `ethtool` for a second opinion |
+| `gateway-ping WARN … ICMP may be filtered` | The gateway answers ARP but drops ping: normal for many routers and clouds; test a TCP port instead (`-t`) |
+| `gateway-ping n/a ICMP not permitted` | The user may not send ICMP (unusual on Ubuntu, which allows unprivileged ICMP sockets); run as root or check `net.ipv4.ping_group_range` |
+| `gateway-neighbour n/a` (PowerShell on Linux) | .NET does not expose the ARP table; run `ip neigh show` |
+| `tcp-connect FAIL … timed out` vs `… refused` | Timed out = filtered or no route; refused = the host answered and nothing listens (Day 12) |
+| `-p needs -t HOST` (exit 1) | Give the target too: `-t HOST -p PORT` / `-Target HOST -Port PORT` |
+| Script exits 3 in a scheduler and the job is marked as failed | Expected: 3 means *a check failed*; configure the scheduler to treat 3 as an alert |
+
+### Validation status
+
+| Check | Linux script | PowerShell script |
+|---|---|---|
+| Executed | 2026-11-14 in an Ubuntu 24.04.5 container (Bash 5.2.21, iproute2, iputils-ping, ethtool), on the container host (no arguments: exit 0 with a `counters WARN`) and in two test network namespaces joined by a veth pair with a Python listener: healthy run with `-t`/`-p`/`-n` (exit 0), `-f csv`, `-o`, `-e 5`, wrong gateway, no default route (with and without `-i`), peer link down, interface admin down, closed port, port dropped by an iptables rule (timeout) and absent host (all exit 3), run as `nobody` (exit 0), invalid options, port, `-p` without `-t`, `-e`, interface, format, host and extra argument (exit 1), `-o` pointing below a file and an unwritable `-o` as `nobody` (exit 2). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (PowerShell could not be installed on the release host). NetAdapter/NetTCPIP/DnsClient property names and .NET `NetworkInterface`, `Ping` and `TcpClient` usage reviewed from the official documentation. CI parses it, runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (no arguments and `-OutputPath`) and runs PSScriptAnalyzer |
+| Static analysis | `bash -n` and ShellCheck 0.11.0 (no findings at any severity, `-S style`) | PSScriptAnalyzer in CI (Error and Warning severities) |
+
+## log-analyser.sh / Log-Analyser.ps1
+
+**Purpose:** a read-only summary of the system log for the last *N* hours — entries by severity, the noisiest programs or event sources, the most frequent error and warning messages (numbers replaced by `N` and long hex values by `X`, so that *"connect() failed … upstream 10.0.0.5:8080"* and *"… 10.0.0.6:8080"* are counted together), kernel/driver errors and a first look at failed authentications (covered fully on Day 17). It exits with code **3** when the number of error-level entries is above a threshold. Taught in [Day 16](../course/module-4/day-16.md) and used in [Lab 16](../labs/lab-16.md).
+
+**Severity differs by source — the report always says which one it used.** The systemd journal stores a real `PRIORITY` (0 `emerg` … 3 `err`, 4 `warning`, 5 `notice`, 6 `info`, 7 `debug`) and Windows events a real `Level` (1 Critical, 2 Error, 3 Warning). Syslog **text files** do not store the priority in the line, so for them the scripts **infer** it from keywords: `error`, `fail`, `critical`, `panic`, `fatal`, `segfault` → error; `warn` → warning; everything else → info. Inferred counts are a triage aid, not an exact measure: *"0 failed"* counts as an error line.
+
+### Prerequisites
+
+| Linux | Windows |
+|---|---|
+| Ubuntu 24.04 (any Linux with `journalctl` or a syslog text file). Bash 4+, GNU `date`, `awk`, `sort`; `zcat` for `.gz` files. Source order: `-l FILE`, else the **systemd journal** if `journalctl` returns entries, else `/var/log/syslog`, else `/var/log/messages`. Without root, the journal shows only your own entries unless you are in the `adm` or `systemd-journal` group, and `/var/log/syslog` and `/var/log/auth.log` are readable only by root and `adm`; the report notes a non-root run. With no readable source it reports `n/a` and exits 0. | Windows 11, Windows PowerShell 5.1 or PowerShell 7. `Get-WinEvent -FilterHashtable` for levels 1–3 in each `-LogName` (default `System`, `Application`), at most 20,000 events per log (the report notes when the limit is hit). No admin for System and Application; the **Security** log (failed logons, event 4625) needs an elevated session and is otherwise `n/a`. `-Path` reads an exported `.evtx` file or a Linux syslog-format text file. In PowerShell 7 on Linux the journal is read with `journalctl -o json -p warning`. |
+
+### Options
+
+| Bash | PowerShell | Default | Meaning |
+|---|---|---|---|
+| `-l FILE` | `-Path FILE` | journal / syslog (Linux), event logs (Windows) | Analyse a saved file: syslog text or `.gz` (both), `.evtx` (PowerShell on Windows) |
+| — | `-LogName LOG[,LOG]` | `System, Application` | Windows event logs to query |
+| `-s HOURS` | `-Hours N` | 24 | Time window; `0` = the whole file or log |
+| `-n TOP` | `-Top N` | 10 | Length of the "top" lists (1–100) |
+| `-c MAXERR` | `-MaxErrors N` | 50 | Error-level entries allowed before exit code 3 |
+| <code>-f text&#124;csv</code> | <code>-Format Text&#124;Csv&#124;Json</code> | text | Output format |
+| `-o DIR` | `-OutputPath DIR` | — | Also save a timestamped report file |
+| `-h` | `Get-Help .\Log-Analyser.ps1 -Full` | — | Help |
+
+Exit codes: `0` OK (also when no log is readable: `n/a`) · `1` invalid arguments (including a missing `-l`/`-Path` file) · `2` output folder cannot be created or written · `3` more than `MAXERR` error-level entries (journal priority 0–3, inferred *error*, Windows Critical + Error).
+
+What each script counts: the Bash script reports **every** entry in the window by severity; the PowerShell script collects only **warning and worse** (levels 1–3, or journal priority 0–4), because reading every Information event of a Windows log is slow. The *error-level* count and the exit code mean the same thing in both. Text-file timestamps are compared with this host's local time: RFC 3339 (`2026-11-14T10:00:00.123456+00:00`, the Ubuntu 24.04 rsyslog default) and classic (`Nov 14 10:00:00`, no year) formats are both understood; use `-s 0` for files copied from another time zone or an older period.
+
+### How to run
+
+```bash
+cd scripts/linux
+bash log-analyser.sh                                  # journal (or syslog), last 24 h
+sudo bash log-analyser.sh -s 2 -n 5                   # everything readable, last 2 hours, top 5
+bash log-analyser.sh -l /var/log/syslog.2.gz -s 0     # a rotated file, whole content (adm group or sudo)
+sudo bash log-analyser.sh -c 10; echo "exit: $?"      # 3 = more than 10 error-level entries
+bash log-analyser.sh -f csv -o ~/lpm-lab/reports
+```
+
+```powershell
+Set-Location scripts\powershell
+.\Log-Analyser.ps1
+.\Log-Analyser.ps1 -LogName System -Hours 2 -Top 5
+.\Log-Analyser.ps1 -LogName System, Application, Security -MaxErrors 10   # Security needs an elevated window
+.\Log-Analyser.ps1 -Path $HOME\lpm-lab\System-export.evtx -Hours 0 -Format Csv -OutputPath $HOME\lpm-lab\reports
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Log-Analyser.ps1; "exit: $LASTEXITCODE"
+```
+
+### Sample output (Bash; captured on 2026-11-14 in an Ubuntu 24.04.5 container from a 10-line RFC 3339 test log, one line of which was older than the window; host and path renamed)
+
+```text
+==============================================
+ Log Analyser Report
+==============================================
+Report time (UTC)    : 2026-11-14T16:47:58Z
+Host name            : ubuntu-lab
+Source               : /home/student/lab16/rfc.log
+Window               : last 24 h (since 2026-11-13 16:47:58 local time)
+Severity             : inferred from keywords (text file)
+Entries              : 9
+Error-level entries  : 6 (threshold 5)
+Kernel errors        : 1
+Status               : ALERT
+
+--- Entries by severity ---
+      6  err
+      1  warning
+      2  info
+
+--- Top 5 programs ---
+      3  sshd
+      2  nginx
+      1  app
+      1  kernel
+      1  sudo
+
+--- Top 5 error/warning messages (digits -> N, hex -> X) ---
+      2  err      nginx: N/N/N connect() failed (N: Connection refused) while connecting to upstream N.N.N.N:N
+      1  warning  app: warning: cache X nearly full (N%)
+      1  err      kernel: EXT4-fs error (device sda1): ext4_find_entry:N: inode #N: comm ls: reading directory lblock N
+      1  err      sshd: Failed password for invalid user admin from N.N.N.N port N ssh2
+      1  err      sshd: Failed password for root from N.N.N.N port N ssh2
+
+--- Authentication (source: /home/student/lab16/rfc.log; details in Day 17) ---
+SSH failed password/key      : 2
+SSH invalid user             : 1
+sudo authentication failures : 1
+```
+
+The command was `log-analyser.sh -l ~/lab16/rfc.log -c 5 -n 5` and the exit code was `3` (6 error-level entries > 5). Digits that follow a letter are kept (`EXT4`, `sda1`, `ext4_find_entry`), so device and file-system names stay readable. A run without `-l` on the same container read the **systemd journal** (`Severity : journal PRIORITY field`, real `crit`/`err`/`warning`/`notice`/`info`/`debug` counts); with `journalctl` removed from `PATH` it fell back to `/var/log/syslog` and took the authentication counts from `/var/log/auth.log`; as `nobody` it reported `Source : n/a` and exited 0.
+
+### Sample output (PowerShell; **example** of the layout on Windows — illustrative values, not captured on Windows)
+
+```text
+==============================================
+ Log Analyser Report
+==============================================
+Report time (UTC)      : 2026-11-14T17:12:09Z
+Computer name          : WIN11-LAB
+Source                 : Windows event logs: System, Application
+Window                 : last 24 h (since 2026-11-13 22:42:09 local time)
+Severity               : Windows event Level
+Events (warning+)      : 41
+Critical + Error       : 9 (threshold 50)
+Kernel/driver errors   : 1
+Failed logons          : n/a (Security log needs an elevated session)
+Status                 : OK
+PowerShell             : 5.1.26100.9168 (Desktop)
+
+--- Logs ---
+System                                   read
+Application                              read
+
+--- Events by level ---
+      1  Critical
+      8  Error
+     32  Warning
+
+--- Top 10 sources ---
+     14  Microsoft-Windows-DistributedCOM
+      7  Microsoft-Windows-Time-Service
+      5  Application Error
+...
+
+--- Top 10 source / event ID ---
+     14  Microsoft-Windows-DistributedCOM / 10016
+      5  Application Error / 1000
+      1  Microsoft-Windows-Kernel-Power / 41
+...
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `Source : n/a` / `Status : n/a (no readable log source)` | No permission: run with `sudo`, or add the user to `adm` (text logs) / `systemd-journal` (journal) |
+| `Note : not root: only logs readable by …` | Counts may be incomplete; repeat with `sudo` |
+| Text file shows `Entries : 0` | The window excludes it: the file is older than `-s` hours or from another time zone; use `-s 0` |
+| Many "errors" that are not errors | Text files use keyword inference (`0 failed` is an error line); prefer the journal, which stores the real priority |
+| `-l '…' is not a readable file` (exit 1) | Wrong path, or `/var/log/syslog` without `sudo`/`adm` |
+| `Failed logons : n/a (Security log needs an elevated session)` | Run PowerShell as Administrator to include event 4625 |
+| A log shows `n/a (log does not exist)` | The `-LogName` is misspelled; list logs with `Get-WinEvent -ListLog *` |
+| `Note : at least one log returned 20000 events` | Shorten `-Hours`; the counts are a minimum |
+| Script exits 3 in a scheduler and the job is marked as failed | Expected: 3 means *too many errors*; configure the scheduler to treat 3 as an alert |
+| `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or the one-off `-ExecutionPolicy Bypass -File` form |
+
+### Validation status
+
+| Check | Linux script | PowerShell script |
+|---|---|---|
+| Executed | 2026-11-14 in an Ubuntu 24.04.5 container (Bash 5.2.21, mawk 1.3.4, journald and rsyslog running): no arguments (journal source, exit 0), `-c 3` on the journal (exit 3), `-n`, `-f csv`, `-o`, test files in RFC 3339 and classic formats incl. a line outside the window, a `.gz` copy, `-s 0`, the `/var/log/syslog` + `/var/log/auth.log` fallback (PATH without `journalctl`), run as `nobody` (no readable source: `n/a`, exit 0; readable `-l` file above the threshold: exit 3), invalid `-s`, `-n`, `-c`, format, `-l` path, option and extra argument (exit 1), `-o` below a file and an unwritable `-o` as `nobody` (exit 2). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (PowerShell could not be installed on the release host). `Get-WinEvent -FilterHashtable` keys (`LogName`, `Path`, `Level`, `Id`, `StartTime`), `-MaxEvents`, the `NoMatchingEventsFound` error and `EventLogRecord` properties reviewed from the official documentation. CI parses it, runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (no arguments and `-OutputPath`) and runs PSScriptAnalyzer |
+| Static analysis | `bash -n` and ShellCheck 0.11.0 (no findings at any severity, `-S style`) | PSScriptAnalyzer in CI (Error and Warning severities) |
