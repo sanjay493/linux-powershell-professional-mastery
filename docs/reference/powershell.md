@@ -1624,3 +1624,159 @@ IP configuration (Day 11) and connectivity testing (Day 12). The `Net*` cmdlets 
 | **Common errors** | Comparing `PRIORITY` as a number without casting · no `sudo` → own user journal only |
 | **Use case** | Cross-platform log summaries (the course's `Log-Analyser.ps1` uses this on Linux). |
 | **Docs** | <https://man7.org/linux/man-pages/man1/journalctl.1.html> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertfrom-json> |
+
+## Authentication
+
+### Get-WinEvent for the Security log (4624 / 4625)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7 on **Windows only**. Reading the Security log needs elevation |
+| **Description** | Reads logon success (**4624**) and failure (**4625**) events. The detail (TargetUserName, IpAddress, LogonType, SubStatus) is in **EventData**, read via `ToXml()` or an XPath filter. Filter on the server with `-FilterHashtable`/`-FilterXPath`; never pipe a whole log to `Where-Object`. |
+| **Syntax** | `Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625; StartTime=(Get-Date).AddHours(-24)} [-MaxEvents N]` · `-FilterXPath "*[System/EventID=4625] and *[EventData/Data[@Name='TargetUserName']='USER']"` |
+| **Parameters** | `Id` 4624 success / 4625 fail / 4634,4647 logoff / 4648 explicit creds / 4672 special privileges · LogonType 2 interactive, 3 network, 4 batch, 5 service, 7 unlock, 8 network-cleartext, 9 new-credentials, 10 RemoteInteractive(RDP), 11 cached · SubStatus `0xC000006A`/`0xC000006D` wrong password, `0xC0000064` no such user, `0xC0000234` locked out, `0xC0000072` disabled, `0xC0000070`/`0xC0000071` restriction/expired password, `0xC0000193`/`0xC0000224` expired |
+| **Example** | <code>Get-WinEvent -FilterHashtable @{LogName='Security';Id=4625} -MaxEvents 1 &#124; ForEach-Object { ([xml]$_.ToXml()).Event.EventData.Data }</code> |
+| **Expected output** | rows of `Name`/`#text`: `TargetUserName deploy`, `IpAddress 203.0.113.45`, `LogonType 3`, `SubStatus 0xC000006A` (example) |
+| **Equivalent** | <code>journalctl _COMM=sshd -g 'Failed password&#124;Accepted'</code> · `auth.log` |
+| **Common errors** | `Access denied` (not elevated) · `No events` when Logon auditing is off (`auditpol /get /subcategory:"Logon"`) · `Where-Object` over the whole log (slow) · `Get-EventLog` used in PowerShell 7 (5.1 only) |
+| **Use case** | Find failed logons, decode why they failed, and rank attacker source addresses. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent> · <https://learn.microsoft.com/en-us/windows/security/threat-protection/auditing/event-4625> |
+
+### auditpol / net accounts (policy, read-only)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows (any shell). `auditpol /get` needs elevation; `net accounts` read is non-admin |
+| **Description** | `auditpol /get` shows the effective **audit policy** (whether logon/lockout events are even recorded); `net accounts` shows password and **lockout** policy (threshold, duration, window). |
+| **Syntax** | `auditpol /get /category:*` · `auditpol /get /subcategory:"Logon","Account Lockout"` · `net accounts` · `net user <name>` |
+| **Parameters** | `/category:*` all · `/subcategory:"Logon"` one subcategory · `net accounts /domain` (domain policy from a member) |
+| **Example** | `auditpol /get /subcategory:"Logon"` |
+| **Expected output** | `Logon    Success and Failure` · `net accounts` → `Lockout threshold: 5`, `Lockout duration (minutes): 30` (example) |
+| **Equivalent** | `sudo sshd -T` (service layer) · `pam_faillock`/`faillock.conf` (lockout) |
+| **Common errors** | `auditpol` without elevation · concluding "no attacks" when auditing is simply off · confusing local vs domain policy |
+| **Use case** | Before hunting 4625s, confirm the events are recorded; check whether lockout is enforced. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/auditpol> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/net-accounts> |
+
+### Get-LocalUser / quser / whoami (identity)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | `Get-LocalUser`: 5.1 and 7 on Windows. `quser`/`whoami.exe`: Windows (any shell) |
+| **Description** | `Get-LocalUser` lists local accounts with `Enabled` and `LastLogon`; `quser` lists interactive sessions; `whoami /groups /priv` shows the current token's groups and privileges. |
+| **Syntax** | <code>Get-LocalUser [NAME] &#124; Select Name,Enabled,LastLogon</code> · `quser` / `query user` · `whoami /groups` · `whoami /priv` · `whoami /all` |
+| **Parameters** | `Get-LocalGroupMember Administrators` members of a group · `whoami /priv` privileges (e.g. SeDebugPrivilege) |
+| **Example** | <code>Get-LocalUser &#124; Where-Object Enabled &#124; Select Name,LastLogon</code> |
+| **Expected output** | `student  True  15-11-2026 09:40:11` (example) |
+| **Equivalent** | `getent passwd` · `id` · `lastlog` · `who`/`w` |
+| **Common errors** | `Get-LocalUser` does not exist on PowerShell 7 **for Linux** · `LastLogon` is the local record, not domain-wide |
+| **Use case** | Enumerate accounts, spot enabled-but-unused accounts, confirm current privileges during IR. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/get-localuser> |
+
+## Firewall
+
+All entries below are **Windows-only** (NetSecurity and NetConnection modules: Windows PowerShell 5.1 and PowerShell 7 on Windows; not available in PowerShell 7 on Linux/macOS). Changes need an elevated window. Outputs are examples.
+
+### Get-NetConnectionProfile / Set-NetConnectionProfile
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetConnection). `Set-` needs elevation |
+| **Description** | Shows the network category of each connection (`Public`, `Private`, `DomainAuthenticated`), which decides which firewall profile applies; changes a connection between Public and Private. |
+| **Syntax** | <code>Get-NetConnectionProfile [-InterfaceAlias &lt;String[]&gt;]</code> · <code>Set-NetConnectionProfile -InterfaceAlias &lt;String[]&gt; -NetworkCategory &lt;Public&#124;Private&gt;</code> |
+| **Parameters** | `-InterfaceAlias Ethernet` · `-NetworkCategory Private` (`DomainAuthenticated` is set by Windows only) |
+| **Example** | <code>Get-NetConnectionProfile &#124; Select-Object InterfaceAlias, NetworkCategory</code> |
+| **Expected output** | `Ethernet  Public` (example) |
+| **Equivalent** | firewalld zone of an interface: `firewall-cmd --get-active-zones` |
+| **Common errors** | Opening rules for Public instead of fixing a misclassified trusted network · trying to set `DomainAuthenticated` |
+| **Use case** | "Sharing works in the office but not at home" — the home network is Public. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netconnection/get-netconnectionprofile> · <https://learn.microsoft.com/en-us/powershell/module/netconnection/set-netconnectionprofile> |
+
+### Get-NetFirewallProfile / Set-NetFirewallProfile
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetSecurity). `Set-` needs elevation |
+| **Description** | Domain/Private/Public profile settings: `Enabled`, `DefaultInboundAction`, `DefaultOutboundAction`, `AllowInboundRules`, logging (`LogFileName`, `LogBlocked`, `LogAllowed`, `LogMaxSizeKilobytes`). Use the ActiveStore for effective values. |
+| **Syntax** | <code>Get-NetFirewallProfile [-Name &lt;String[]&gt;] [-PolicyStore &lt;String&gt;]</code> · <code>Set-NetFirewallProfile [-Profile &lt;String[]&gt;] [-DefaultInboundAction Block&#124;Allow] [-LogBlocked True&#124;False] [-LogFileName &lt;String&gt;] [-LogMaxSizeKilobytes &lt;UInt64&gt;]</code> |
+| **Parameters** | `-PolicyStore ActiveStore` (local + GPO) · `-Profile Domain, Private, Public` · `-LogBlocked True` → `%SystemRoot%\System32\LogFiles\Firewall\pfirewall.log` |
+| **Example** | `Get-NetFirewallProfile -PolicyStore ActiveStore` then `Set-NetFirewallProfile -Profile Domain, Private, Public -LogBlocked True` |
+| **Expected output** | `Public  True  Block  Allow  False` for Name, Enabled, DefaultInboundAction, DefaultOutboundAction, LogBlocked (example) |
+| **Equivalent** | `ufw status verbose` · `ufw default deny incoming` · `ufw logging low` |
+| **Common errors** | Reading `NotConfigured` from the persistent store and assuming "off" · GPO overriding local settings · `Set-NetFirewallProfile -Enabled False` as a "fix" (never) |
+| **Use case** | Verifying a server baseline (all profiles on, inbound Block) and enabling dropped-packet logging. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netsecurity/get-netfirewallprofile> · <https://learn.microsoft.com/en-us/powershell/module/netsecurity/set-netfirewallprofile> |
+
+### Get-NetFirewallRule and its filters
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** (NetSecurity); reading needs no elevation |
+| **Description** | Lists rules (`Name`, `DisplayName`, `Group`, `Enabled`, `Direction`, `Action`, `Profile`); conditions are separate objects returned by `Get-NetFirewallPortFilter`, `-AddressFilter`, `-ApplicationFilter`, `-ServiceFilter` via the pipeline. Block wins over Allow; there is no rule order. |
+| **Syntax** | <code>Get-NetFirewallRule [-DisplayName &lt;String[]&gt;] [-Group &lt;String[]&gt;] [-Enabled True&#124;False] [-Direction Inbound&#124;Outbound] [-Action Allow&#124;Block] [-PolicyStore &lt;String&gt;]</code> · <code>Get-NetFirewallRule … &#124; Get-NetFirewallPortFilter</code> |
+| **Parameters** | `-Enabled True` (enumeration) · `-DisplayGroup 'Remote Desktop'` · `-PolicyStore ActiveStore` · reverse lookup <code>Get-NetFirewallPortFilter &#124; Where-Object LocalPort -eq 3389 &#124; Get-NetFirewallRule</code> |
+| **Example** | <code>Get-NetFirewallRule -Group Lab18 &#124; Get-NetFirewallPortFilter &#124; Select-Object Protocol, LocalPort</code> |
+| **Expected output** | `TCP  9100` (example) |
+| **Equivalent** | `ufw status numbered` · `nft list ruleset` · `iptables -S` |
+| **Common errors** | Filtering by port on the rule object (ports live in the port filter) · `-Enabled $true` instead of `True` · ignoring Block rules that override your Allow |
+| **Use case** | Audit: "which inbound rules are open on the Public profile, for which ports and programs?" |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netsecurity/get-netfirewallrule> · <https://learn.microsoft.com/en-us/powershell/module/netsecurity/get-netfirewallportfilter> |
+
+### New-NetFirewallRule / Set-NetFirewallRule / Copy-NetFirewallRule
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**; elevated |
+| **Description** | Creates, modifies and duplicates rules. Conditions: protocol, local/remote ports, local/remote addresses, program, service, profile, interface type. |
+| **Syntax** | <code>New-NetFirewallRule -DisplayName &lt;String&gt; [-Name &lt;String&gt;] [-Group &lt;String&gt;] [-Direction Inbound&#124;Outbound] [-Action Allow&#124;Block] [-Protocol TCP&#124;UDP&#124;…] [-LocalPort &lt;String[]&gt;] [-RemoteAddress &lt;String[]&gt;] [-Program &lt;String&gt;] [-Profile &lt;String&gt;] [-Description &lt;String&gt;]</code> · <code>Set-NetFirewallRule -Name&#124;-DisplayName&#124;-Group … [-RemoteAddress …] [-NewDisplayName …]</code> · <code>Copy-NetFirewallRule -DisplayName &lt;String&gt; -NewName &lt;String&gt;</code> |
+| **Parameters** | `-LocalPort 443` (needs `-Protocol TCP`/`UDP`) · `-RemoteAddress 10.18.0.16/28, LocalSubnet` · `-Profile Domain, Private` · `-Group 'Lab18'` for bulk management · `-WhatIf` |
+| **Example** | `New-NetFirewallRule -DisplayName 'Lab18 metrics' -Group 'Lab18' -Direction Inbound -Protocol TCP -LocalPort 9100 -RemoteAddress 10.18.0.50 -Action Allow` |
+| **Expected output** | Rule object with `Enabled : True`, `Direction : Inbound`, `Action : Allow` (example) |
+| **Equivalent** | `ufw allow from 10.18.0.50 to any port 9100 proto tcp` · `nft add rule inet lab18 input tcp dport 9100 ip saddr 10.18.0.50 accept` |
+| **Common errors** | `-LocalPort` without `-Protocol` · *Access is denied* (not elevated) · rule for the Domain profile while the network is Public · GUID names (give `-Name`) |
+| **Use case** | Opening a service to exactly the clients that need it, documented in `-Description`. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netsecurity/new-netfirewallrule> · <https://learn.microsoft.com/en-us/powershell/module/netsecurity/set-netfirewallrule> · <https://learn.microsoft.com/en-us/powershell/module/netsecurity/copy-netfirewallrule> |
+
+### Enable- / Disable- / Remove-NetFirewallRule, Show-NetFirewallRule, Get-NetFirewallSetting
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only**; changes elevated |
+| **Description** | Switch rules on/off without deleting, delete rules (with `-WhatIf`), print every rule with all filters, read global firewall settings. |
+| **Syntax** | <code>Enable-NetFirewallRule&#124;Disable-NetFirewallRule&#124;Remove-NetFirewallRule -Name&#124;-DisplayName&#124;-Group &lt;String[]&gt; [-WhatIf] [-Confirm]</code> · <code>Show-NetFirewallRule [-PolicyStore &lt;String&gt;]</code> · `Get-NetFirewallSetting -PolicyStore ActiveStore` |
+| **Parameters** | `-Group 'Lab18'` · `-WhatIf` · `-Confirm` |
+| **Example** | `Remove-NetFirewallRule -Group 'Lab18' -WhatIf` |
+| **Expected output** | `What if: Performing operation "Delete" on Target "Lab18 metrics".` (example) |
+| **Equivalent** | `ufw delete N` · `nft delete rule … handle N` |
+| **Common errors** | Removing by `-DisplayName` when several rules share it · trying to remove GPO rules locally |
+| **Use case** | Clean removal of a project's rules after decommissioning. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/netsecurity/remove-netfirewallrule> · <https://learn.microsoft.com/en-us/powershell/module/netsecurity/show-netfirewallrule> |
+
+### netsh advfirewall (export / import / show)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows, any shell; `export`/`import` elevated |
+| **Description** | Backs up the whole local firewall policy (rules and profile settings) to a `.wfw` file and restores it; text views of profiles and rules. `import` **replaces** the local policy. |
+| **Syntax** | `netsh advfirewall export "FILE.wfw"` · `netsh advfirewall import "FILE.wfw"` · `netsh advfirewall show allprofiles` · `netsh advfirewall firewall show rule name=all dir=in` |
+| **Parameters** | `dir=in` · `name=all` · avoid `netsh advfirewall reset` |
+| **Example** | `netsh advfirewall export "C:\FW\fw-before-chg1818.wfw"` |
+| **Expected output** | `Ok.` (example) |
+| **Equivalent** | `nft list ruleset > f` / `nft -f f` · `tar -C /etc -czf ufw.tgz ufw` · `iptables-save` / `-restore` |
+| **Common errors** | Treating `import` as a merge · forgetting to export before a change · *The requested operation requires elevation* |
+| **Use case** | Known-good backup and timed rollback (scheduled task that runs `import`). |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure-with-command-line> |
+
+### pfirewall.log and Filtering Platform events
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows; reading the log and the Security log needs elevation |
+| **Description** | Per-profile W3C-style text log of dropped (and optionally allowed) packets; Security events 5152 (packet dropped), 5157 (connection blocked), 5156 (connection allowed) when the *Filtering Platform* audit subcategories are enabled. |
+| **Syntax** | <code>Get-Content "$env:SystemRoot\System32\LogFiles\Firewall\pfirewall.log" -Tail 50</code> · `auditpol /set /subcategory:"Filtering Platform Connection" /failure:enable` · `Get-WinEvent -FilterHashtable @{LogName='Security'; Id=5157}` |
+| **Parameters** | Fields `date time action protocol src-ip dst-ip src-port dst-port size tcpflags …` (newer builds add `pid`) · `#Time Format: Local` |
+| **Example** | <code>Get-Content $log -Tail 500 &#124; Where-Object { $_ -match ' DROP ' }</code> |
+| **Expected output** | `2026-11-15 22:10:04 DROP TCP 10.18.0.100 10.18.0.60 51544 5432 52 S 3172839012 0 64240 - - - RECEIVE` (example) |
+| **Equivalent** | `[UFW BLOCK]` lines in `journalctl -k` / `/var/log/ufw.log` |
+| **Common errors** | Empty log because `LogBlocked` is off for the active profile · enabling `/success` (5156 floods the Security log) · forgetting local time |
+| **Use case** | Proving that the firewall dropped a client's connection; spotting scans. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure-logging> · <https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/audit-filtering-platform-connection> |

@@ -1476,4 +1476,4 @@ journalctl -o json --no-pager | ForEach-Object { $_ | ConvertFrom-Json }   # Pow
 
 ---
 
-**Previous:** [Day 15: Network Interfaces and Diagnostics](../module-3/day-15.md) · **Next:** Day 17: Authentication and Security Monitoring (see the [release schedule](../schedule.md))
+**Previous:** [Day 15: Network Interfaces and Diagnostics](../module-3/day-15.md) · **Next:** [Day 17: Authentication and Security Monitoring](day-17.md)

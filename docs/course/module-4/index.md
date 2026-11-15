@@ -20,8 +20,8 @@ You will investigate system and security logs, detect suspicious authentication 
 | Day | Lesson | Lab | Status |
 |---|---|---|---|
 | 16 | [System Logs](day-16.md) | [Lab 16](../../labs/lab-16.md) | Published |
-| 17 | Authentication and Security Monitoring | Lab 17 | 2026-11-15 22:00 IST |
-| 18 | Firewall Management | Lab 18 | 2026-11-15 22:00 IST |
+| 17 | [Authentication and Security Monitoring](day-17.md) | [Lab 17](../../labs/lab-17.md) | Published |
+| 18 | [Firewall Management](day-18.md) | [Lab 18](../../labs/lab-18.md) | Published |
 | 19 | System Security Auditing | Lab 19 | 2026-11-16 22:00 IST |
 | 20 | Network Security Investigation | Lab 20 | 2026-11-16 22:00 IST |
 

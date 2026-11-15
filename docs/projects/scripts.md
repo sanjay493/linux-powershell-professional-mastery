@@ -29,7 +29,7 @@ Scripts live in the repository under `scripts/linux/` and `scripts/powershell/`.
 | 5 | `port-monitor.sh` | `Port-Monitor.ps1` | Listening ports and owning processes, baseline diff | **Day 14 (available)** |
 | 6 | `network-diagnostic.sh` | `Network-Diagnostic.ps1` | Layered connectivity diagnosis | **Day 15 (available)** |
 | 7 | `log-analyser.sh` | `Log-Analyser.ps1` | Error/warning summaries from system logs | **Day 16 (available)** |
-| 8 | `failed-login-report.sh` | `Failed-Login-Report.ps1` | Failed authentication summary by account and source | Day 17 |
+| 8 | `failed-login-report.sh` | `Failed-Login-Report.ps1` | Failed authentication summary by account and source | **Day 17 (available)** |
 | 9 | `system-health.sh` | `System-Health.ps1` | Thresholded health check for scheduling | Day 25 |
 | 10 | `daily-report.sh` | `Daily-Report.ps1` | Combined daily text and CSV report | Day 29 |
 
@@ -949,3 +949,163 @@ Application                              read
 |---|---|---|
 | Executed | 2026-11-14 in an Ubuntu 24.04.5 container (Bash 5.2.21, mawk 1.3.4, journald and rsyslog running): no arguments (journal source, exit 0), `-c 3` on the journal (exit 3), `-n`, `-f csv`, `-o`, test files in RFC 3339 and classic formats incl. a line outside the window, a `.gz` copy, `-s 0`, the `/var/log/syslog` + `/var/log/auth.log` fallback (PATH without `journalctl`), run as `nobody` (no readable source: `n/a`, exit 0; readable `-l` file above the threshold: exit 3), invalid `-s`, `-n`, `-c`, format, `-l` path, option and extra argument (exit 1), `-o` below a file and an unwritable `-o` as `nobody` (exit 2). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (PowerShell could not be installed on the release host). `Get-WinEvent -FilterHashtable` keys (`LogName`, `Path`, `Level`, `Id`, `StartTime`), `-MaxEvents`, the `NoMatchingEventsFound` error and `EventLogRecord` properties reviewed from the official documentation. CI parses it, runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (no arguments and `-OutputPath`) and runs PSScriptAnalyzer |
 | Static analysis | `bash -n` and ShellCheck 0.11.0 (no findings at any severity, `-S style`) | PSScriptAnalyzer in CI (Error and Warning severities) |
+
+## failed-login-report.sh / Failed-Login-Report.ps1
+
+**Purpose:** a read-only authentication report for the last *N* hours — failed and accepted logins, the source addresses and accounts behind the failures, account lockouts (Windows), `sudo` and `su` failures (Linux), the addresses that reached a failure **threshold**, and **success after failure**: an address that failed and then logged in. That last item is the one to investigate first, because it is exactly what a guessed password looks like (it is also what a user who mistyped once looks like — the report cannot tell them apart; you can). It exits with code **3** when either condition is found. Taught in [Day 17](../course/module-4/day-17.md) and used in [Lab 17](../labs/lab-17.md).
+
+**What counts as one failed attempt.** Linux: every sshd `Failed password|publickey|keyboard-interactive/pam for [invalid user] USER from IP` line; an `Invalid user USER from IP port P` line that has **no** `Failed` line for the same address and port (key-only servers never log `Failed password`) is added as a failure too, so it is not counted twice. `sudo` *incorrect password attempts* and *user NOT in sudoers* and `su` *FAILED SU* lines are reported separately. Windows: every event **4625**, with the reason taken from `SubStatus` (or `Status` when `SubStatus` is `0x0`) and translated (`0xc000006a` wrong password, `0xc0000064` user name does not exist, `0xc0000234` account locked out, …). Successful Windows logons (4624) of computer accounts (`NAME$`) and built-in service accounts are ignored; success after failure considers only network (type 3) and Remote Desktop (type 10) logons.
+
+### Prerequisites
+
+| Linux | Windows |
+|---|---|
+| Ubuntu 24.04 (any Linux with `journalctl` or an auth-log text file). Bash 4+, GNU `date`, `awk`, `sort`; `zcat` for `.gz` files. Source order: `-l FILE`, else the **systemd journal** (identifiers `sshd`, `sshd-session`, `sudo`, `su`, `login`) if it returns entries, else `/var/log/auth.log` (Debian/Ubuntu), else `/var/log/secure` (RHEL family). Rotated files are read only when named with `-l`. Without root, the journal shows only your own entries unless you are in `adm` or `systemd-journal`, and `auth.log` is readable by root and `adm`; the report notes a non-root run. No readable source: `n/a`, exit 0. | Windows 11 / Windows Server, Windows PowerShell 5.1 or PowerShell 7. `Get-WinEvent -FilterHashtable @{LogName='Security'; Id=4625,4624,4740}` with `EventData` read by name from `ToXml()`, at most 50,000 events (the report notes truncation). The **Security log needs an elevated session**; otherwise it is reported as `n/a (access denied …)` and the script exits 0. `-LogFile` parses a Linux auth-log text file (plain or `.gz`) on any OS; in PowerShell 7 on Linux without `-LogFile`, `/var/log/auth.log` or `/var/log/secure` is read. |
+
+### Options
+
+| Bash | PowerShell | Default | Meaning |
+|---|---|---|---|
+| `-l FILE` | `-LogFile FILE` | journal / `auth.log` (Linux), Security log (Windows) | Analyse a saved auth-log text file (plain or `.gz`) |
+| `-s HOURS` | `-Hours N` | 24 | Time window; `0` = the whole file or log |
+| `-t THRESHOLD` | `-Threshold N` | 10 | Failed attempts from one address that count as an attack (1–100000) |
+| `-n TOP` | `-Top N` | 10 | Length of the "top" lists (1–100) |
+| <code>-f text&#124;csv</code> | <code>-Format Text&#124;Csv&#124;Json</code> | text | Output format |
+| `-o DIR` | `-OutputPath DIR` | — | Also save a timestamped report file |
+| `-h` | `Get-Help .\Failed-Login-Report.ps1 -Full` | — | Help |
+
+Exit codes: `0` OK (also when no log is readable: `n/a`) · `1` invalid arguments (including a missing `-l`/`-LogFile` file) · `2` output folder cannot be created or written · `3` **alert**: at least one source address reached the threshold, or a success after failure was found.
+
+### How to run
+
+```bash
+cd scripts/linux
+sudo bash failed-login-report.sh                          # journal (or auth.log), last 24 h
+sudo bash failed-login-report.sh -s 2 -t 5 -n 5           # last 2 hours, alert at 5 failures per address
+bash failed-login-report.sh -l ~/lab17/logs/auth.log.2.gz -s 0   # a saved or rotated file, whole content
+sudo bash failed-login-report.sh -t 20; echo "exit: $?"   # 3 = attack threshold or success after failure
+sudo bash failed-login-report.sh -f csv -o ~/lpm-lab/reports
+```
+
+```powershell
+Set-Location scripts\powershell
+.\Failed-Login-Report.ps1                                  # elevated window: Security log, last 24 h
+.\Failed-Login-Report.ps1 -Hours 2 -Threshold 5 -Top 5
+.\Failed-Login-Report.ps1 -Format Json -OutputPath $HOME\lpm-lab\reports
+.\Failed-Login-Report.ps1 -LogFile $HOME\lab17\logs\auth.log -Hours 0      # a copied Linux auth.log
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Failed-Login-Report.ps1; "exit: $LASTEXITCODE"
+```
+
+### Sample output (Bash; captured on 2026-11-15 in an Ubuntu 24.04.5 container from a 15-line RFC 3339 test `auth.log`; host and path renamed)
+
+```text
+==============================================
+ Failed Login Report
+==============================================
+Report time (UTC)              : 2026-11-15T16:46:55Z
+Host name                      : ubuntu-lab
+Source                         : /home/student/flr-test/auth.log
+Window                         : all entries
+SSH failed attempts            : 5
+SSH invalid-user lines         : 2
+SSH max auth attempts exceeded : 1
+SSH accepted logins            : 2
+sudo incorrect password events : 1
+sudo user NOT in sudoers       : 1
+sudo commands run              : 1
+su failures                    : 1
+Console login failures         : 0
+Distinct failing addresses     : 2
+Addresses at/over threshold    : 1 (threshold 3)
+Success after failure          : 1
+Status                         : ALERT
+
+--- Accepted logins by method ---
+      1  password
+      1  publickey
+
+--- Top 10 source addresses of failed attempts ---
+  fails  accounts  address                                  first                last
+      4         3  203.0.113.50                             2026-11-15T02:10:00  2026-11-15T02:12:00
+      1         1  198.51.100.9                             2026-11-15T02:11:00  2026-11-15T02:11:00
+
+--- Top 10 targeted accounts ---
+      2  root
+      1  deploy
+      1  oracle (invalid)
+      1  test (invalid)
+
+--- Addresses with 3 or more failed attempts ---
+      4  203.0.113.50  (3 accounts)
+
+--- Success after failure (investigate!) ---
+2026-11-15T02:13:00  203.0.113.50  user=deploy  method=password  failures_from_address=4
+```
+
+The command was `failed-login-report.sh -l ~/flr-test/auth.log -s 0 -t 3` and the exit code was `3`. Read it like an analyst: `203.0.113.50` tried three accounts (one of them non-existent), hit sshd's `MaxAuthTries` once, and **then logged in as `deploy` with a password** — the next lines of the file show `deploy` trying `sudo` without being allowed to and failing `su`. `198.51.100.9` produced only an `Invalid user` line with no `Failed` line (a key-only probe), which the script still counts once. The same file in classic `Nov 15 02:10:00` format and gzip-compressed gave identical counts; without `-l` the script read the container's journal; as `nobody` with no readable source it printed `Source : n/a` and exited 0.
+
+### Sample output (PowerShell; **example** of the layout on Windows — illustrative values, not captured on Windows)
+
+```text
+==============================================
+ Failed Login Report
+==============================================
+Report time (UTC)           : 2026-11-15T17:05:41Z
+Computer                    : WIN11-LAB
+PowerShell                  : Desktop 5.1.26100.9168
+Source                      : Windows Security log (4625, 4624, 4740)
+Source status               : read
+Window                      : last 24 h (since 2026-11-14 22:35:41 local time)
+Failed logons               : 12
+Successful logons           : 9
+Account lockouts (4740)     : 1
+sudo incorrect password     : 0
+sudo NOT in sudoers         : 0
+su failures                 : 0
+Distinct failing addresses  : 2
+Addresses over threshold    : 1 (threshold 10)
+Success after failure       : 0
+Truncated                   : no
+Status                      : ALERT
+
+--- Top 10 source addresses of failed logons ---
+  fails  accounts  address                                  first                last
+     11         1  127.0.0.1                                2026-11-15 22:31:02  2026-11-15 22:31:40
+      1         1  -                                        2026-11-15 22:20:13  2026-11-15 22:20:13
+
+--- Top 10 targeted accounts ---
+     12  WIN11-LAB\lab17-user
+
+--- Failure reasons ---
+      7  0xc000006a wrong password
+      5  0xc0000234 account locked out
+
+--- Failed logons by logon type ---
+     11  3 Network
+      1  2 Interactive
+
+--- Successful logons by logon type ---
+      6  2 Interactive
+      3  5 Service
+...
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `Source : n/a` / `Status : n/a (no readable authentication log)` | No permission: run with `sudo`, or add the analyst account to `adm` (text logs) / `systemd-journal` (journal) |
+| `Source status : n/a (access denied: run from an elevated session)` | The Security log is readable only by Administrators (and members of *Event Log Readers* for remote reads): open PowerShell as Administrator |
+| All counts are 0 although `grep 'Failed password' /var/log/auth.log` finds lines | The lines are older than the window (`-s 24`): use `-s 0`, or the file is from another time zone |
+| Journal source shows fewer events than `auth.log` | Without root you see only your own journal; or the journal is volatile and was reset at boot while `auth.log` persisted — use `-l /var/log/auth.log` |
+| Failures from `-` (Windows) | Local logons (console, `runas`) have no `IpAddress`; they are counted but never trigger success after failure |
+| Success after failure for a known admin | A typo followed by the right password looks the same; confirm with the person and the time, then tune `-t` and your SIEM rule rather than ignoring the alert |
+| A scheduler marks the job as failed | Exit 3 means *alert*; configure the scheduler to treat 3 as a notification, not an error |
+| `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or the one-off `-ExecutionPolicy Bypass -File` form |
+
+### Validation status
+
+| Check | Linux script | PowerShell script |
+|---|---|---|
+| Executed | 2026-11-15 in an Ubuntu 24.04.5 container (Bash 5.2.21, journald and rsyslog started by hand): no arguments (journal source with real sshd logins of throwaway `lab17-*` users, exit 3 because of a success after failure), `-o`, `-f csv`, RFC 3339 and classic-format test files, a `.gz` copy, `-s 1` excluding old lines, `-t 3` and `-t 100`, run as `nobody` (no readable source: `n/a`, exit 0; readable `-l` file: non-root note), invalid `-s`, `-t`, option and `-l` path (exit 1), unwritable `-o` (exit 2). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (installing PowerShell was not permitted on the release host). `Get-WinEvent -FilterHashtable` keys, the `NoMatchingEventsFound` error, 4625/4624/4740 `EventData` names (`TargetUserName`, `TargetDomainName`, `IpAddress`, `LogonType`, `Status`, `SubStatus`, `AuthenticationPackageName`) and the NTSTATUS codes reviewed from knowledge of the official documentation. CI parses it, runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (no arguments and `-OutputPath`) and runs PSScriptAnalyzer |
+| Static analysis | `bash -n` and ShellCheck 0.9.0 (no findings at any severity, `-S style`) | PSScriptAnalyzer in CI (Error and Warning severities) |

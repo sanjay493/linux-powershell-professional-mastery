@@ -1641,3 +1641,176 @@ The basic `journalctl -u` entry is under [Processes & Services](#journalctl-u); 
 | **Common errors** | Empty output on containers/WSL · `lastb` without `sudo` |
 | **Use case** | Quick check of who logged in and when the host rebooted. |
 | **Docs** | <https://man7.org/linux/man-pages/man1/last.1.html> |
+
+## Authentication
+
+New commands from Day 17. (`last` / `lastb` basics are under [Logs](#last-lastb); the entry below adds `who`/`w`/`lastlog` depth.)
+
+### sshd -T / sshd -t (effective config)
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux with openssh-server. Needs root (reads host keys) |
+| **Description** | `sshd -T` prints the **effective** SSH server configuration after all includes and defaults — the authoritative view, unlike reading `sshd_config` by eye. `sshd -t` tests config syntax. On Ubuntu 24.04 the service is socket-activated (`ssh.socket` → `ssh.service`); the listening port is set on the socket. |
+| **Syntax** | `sshd -T` · `sshd -t` · `sshd -T -C user=alice,host=h,addr=1.2.3.4` (match-aware) |
+| **Parameters** | `-T` dump effective config · `-t` test syntax · `-C` evaluate `Match` blocks for a connection · hardening keys: `passwordauthentication`, `permitrootlogin`, `maxauthtries`, `pubkeyauthentication`, `kbdinteractiveauthentication`, `logingracetime`, `loglevel` |
+| **Example** | <code>sudo sshd -T &#124; grep -Ei '^(passwordauthentication&#124;permitrootlogin&#124;maxauthtries&#124;loglevel) '</code> |
+| **Expected output** | `maxauthtries 6` · `permitrootlogin without-password` · `passwordauthentication yes` · `loglevel INFO` (captured, Ubuntu 24.04.5 defaults in a container) |
+| **Equivalent** | `auditpol /get /category:*` (different layer: audit, not service) |
+| **Common errors** | `Permission denied` without `sudo` · editing only `sshd_config` while a drop-in in `sshd_config.d/` overrides it · changing `Port` without editing `ssh.socket` on 24.04 |
+| **Use case** | Confirm a server is keys-only with root login disabled before and after hardening. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/sshd.8.html> · <https://man7.org/linux/man-pages/man5/sshd_config.5.html> |
+
+### who / w / lastlog (sessions and last-login)
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux. `who`/`lastlog`: coreutils/`login`; `w`: procps. `lastlog` is replaced by `lastlog2`/`wtmpdb` on Debian 13 / Fedora 40+ |
+| **Description** | `who` lists current interactive sessions (`/run/utmp`); `w` adds load, idle time and the running command; `lastlog` shows the most recent login per account (`/var/log/lastlog`), including dormant-account queries. |
+| **Syntax** | `who [-a] [-u] [-H]` · `w [-i] [USER]` · `lastlog [-u USER] [-t DAYS] [-b DAYS]` |
+| **Parameters** | `who -a` all records · `w -i` show IPs not names · `lastlog -t 7` logins in last 7 days · `lastlog -b 90` accounts dormant 90+ days |
+| **Example** | `lastlog -b 90` |
+| **Expected output** | `lab17-bob  pts/1  127.0.0.1  Sun Nov 15 16:45:37 +0000 2026` (captured); dormant accounts show `**Never logged in**` |
+| **Equivalent** | `quser` / `query user` (current) · <code>Get-LocalUser &#124; Select Name,LastLogon</code> |
+| **Common errors** | Empty `who`/`w` in containers (no `/run/utmp`) · `lastlog` missing on newer distros (use `lastlog2`) · `w` needs `/proc` |
+| **Use case** | "Who is on this box now?" and "which accounts are stale?" during audits. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/who.1.html> · <https://man7.org/linux/man-pages/man1/w.1.html> · <https://man7.org/linux/man-pages/man8/lastlog.8.html> |
+
+### sudo -l / sudo log lines
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux with sudo. `sudo -l` as the user; `-U` needs privilege |
+| **Description** | `sudo -l` lists what the current user may run via sudo; sudo logs successes (`COMMAND=`), wrong passwords (`N incorrect password attempts`) and policy denials (`user NOT in sudoers`) to `auth.log`. |
+| **Syntax** | `sudo -l [-U USER]` · `sudo -v` (refresh) · `sudo -k` (invalidate cached auth) |
+| **Parameters** | `-l` list rights · `-U USER` another user's rights · `-k` forget timestamp (forces a password prompt) |
+| **Example** | <code>sudo journalctl -t sudo -g 'COMMAND=&#124;incorrect password&#124;NOT in sudoers' -o short-iso</code> |
+| **Expected output** | `sudo[2583]: lab17-alice : user NOT in sudoers ; PWD=/home/lab17-alice ; USER=root ; COMMAND=/usr/bin/id` (captured, container) |
+| **Equivalent** | `whoami /priv` · event 4672 (special privileges) |
+| **Common errors** | Reading only success lines and missing `NOT in sudoers` denials · assuming `sudo -l` needs no password (it may prompt) |
+| **Use case** | The authoritative trail of what was run as root during a change or an intrusion. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/sudo.8.html> · <https://man7.org/linux/man-pages/man5/sudoers.5.html> |
+
+### faillock / pam_faillock
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux with Linux-PAM (libpam-modules-bin). **Not enabled by default on Ubuntu.** Changing counters for others needs root |
+| **Description** | `pam_faillock` locks an account after repeated auth failures; `faillock` shows or resets the per-user counters. Configured in `/etc/security/faillock.conf` (`deny`, `unlock_time`, `fail_interval`, `even_deny_root`) and enabled by adding `pam_faillock.so` to `common-auth`/`common-account`. |
+| **Syntax** | `faillock [--user USER] [--reset]` · config: `deny=N`, `unlock_time=SECONDS`, `fail_interval=SECONDS`, `even_deny_root` |
+| **Parameters** | `--user U` show U's record · `--reset` clear/unlock · `--dir PATH` tally directory |
+| **Example** | `sudo faillock --user alice --reset` |
+| **Expected output** | `alice:` then `When … Type RHOST … Valid` rows, and `account temporarily locked` in `auth.log` once `deny` is reached (captured in a lab stack) |
+| **Equivalent** | `net accounts` lockout policy · event 4740 · `Unlock-ADAccount` (AD) |
+| **Common errors** | Locking out **all** accounts (incl. root) with a bad stack or `even_deny_root` · forgetting a spare root shell · not resetting counters after fixing |
+| **Use case** | Add online-guessing protection where keys-only auth is not possible; always with a backup and rollback. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/pam_faillock.8.html> · <https://man7.org/linux/man-pages/man8/faillock.8.html> |
+
+## Firewall
+
+The entries below cover the host-firewall toolkit from Day 18. Every change needs root; practise on a VM with console access.
+
+### ufw (status, defaults, allow / deny / reject / limit)
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu (package ufw, installed but **inactive** by default; 0.36.2 on 24.04). Front end that writes iptables (nf_tables) rules; config in `/etc/default/ufw` and `/etc/ufw/` |
+| **Description** | Manages a stateful host firewall with simple commands. Rules are evaluated in order, first match wins; defaults apply when no rule matches. `limit` rejects an address that opens 6 or more connections within 30 seconds. |
+| **Syntax** | <code>ufw [--dry-run] [--force] enable &#124; disable &#124; reload &#124; status [verbose&#124;numbered]</code> · <code>ufw default allow&#124;deny&#124;reject incoming&#124;outgoing&#124;routed</code> · <code>ufw [insert N] allow&#124;deny&#124;reject&#124;limit [in&#124;out] [proto P] [from ADDR] [to ADDR] [port N] [comment 'TEXT']</code> |
+| **Parameters** | `PORT/tcp` (no `/proto` = TCP **and** UDP) · `from 10.18.0.16/28 to any port 22 proto tcp` · `insert 1` · `comment 'CHG-1818'` · `--dry-run` print rules only · `--force` no prompt · `ufw app list` / `app info OpenSSH` |
+| **Example** | `sudo ufw allow from 10.18.0.16/28 to any port 22 proto tcp comment 'admin SSH'` |
+| **Expected output** | `Rule added` (active) or `Rules updated` (inactive); `[ 1] 22/tcp  ALLOW IN  10.18.0.16/28  # admin SSH` in `ufw status numbered` (captured, Day 18) |
+| **Equivalent** | `New-NetFirewallRule -Direction Inbound -Protocol TCP -LocalPort 22 -RemoteAddress 10.18.0.16/28 -Action Allow` |
+| **Common errors** | Enabling over SSH without an SSH rule (lockout) · `ufw deny from ADDR` appended below an allow (use `insert 1`) · forgetting `/tcp` · `ERROR: You need to be root to run this script` |
+| **Use case** | Default-deny inbound policy on a new Ubuntu server; blocking an attacker during an incident (`ufw insert 1 deny from …`). |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/ufw.8.html> · <https://documentation.ubuntu.com/server/how-to/security/firewalls/> |
+
+### ufw delete / show / logging / reset
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu (ufw); root |
+| **Description** | Removes rules by number or text (with a confirmation that shows the rule), prints rules as commands or with listening ports, sets log level, and resets to a clean state after backing up every rules file. |
+| **Syntax** | <code>ufw [--force] delete N &#124; delete RULE</code> · <code>ufw show added &#124; listening &#124; raw</code> · <code>ufw logging off&#124;low&#124;medium&#124;high&#124;full</code> · `ufw [--force] reset` |
+| **Parameters** | Delete from the **highest** number down (numbers shift) · `show listening` = listening ports with the rule that applies · log lines `[UFW BLOCK]`, `[UFW ALLOW]`, `[UFW AUDIT]` in `journalctl -k` and `/var/log/ufw.log` |
+| **Example** | `sudo ufw delete 1` (read the rule it shows, answer `n` to cancel) |
+| **Expected output** | `Deleting:` · `deny from 10.18.0.100 comment 'IR-1742 blocked host'` · <code>Proceed with operation (y&#124;n)? Aborted</code>; `Backing up 'user.rules' to '/etc/ufw/user.rules.20261115_164652'` (captured) |
+| **Equivalent** | `Remove-NetFirewallRule -DisplayName X -WhatIf` · `Set-NetFirewallProfile -LogBlocked True` · `netsh advfirewall reset` (avoid) |
+| **Common errors** | Deleting the wrong number after an earlier delete · `ufw reset` used as troubleshooting (removes all rules and disables the firewall) · no log lines because logging is `off` |
+| **Use case** | Repairing a broken change; summarising scans: <code>grep 'UFW BLOCK' /var/log/ufw.log &#124; sed -E 's/.*SRC=([0-9.]+).*DPT=([0-9]+).*/\1 \2/' &#124; sort &#124; uniq -c</code>. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/ufw.8.html> |
+
+### nft (nftables)
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux 3.13+; Ubuntu 24.04 nftables 1.0.9 (`nftables.service` loads `/etc/nftables.conf` when enabled); RHEL 8+ |
+| **Description** | Native nftables interface: tables in a family (`ip`, `ip6`, `inet`, `arp`, `bridge`, `netdev`), base chains on hooks with a policy, rules, sets and counters. A file loaded with `-f` is applied atomically. |
+| **Syntax** | <code>nft [-c] [-a] -f FILE</code> · <code>nft list ruleset &#124; tables &#124; chain FAMILY TABLE CHAIN &#124; set FAMILY TABLE SET</code> · <code>nft add&#124;insert rule FAMILY TABLE CHAIN [position HANDLE] MATCH… VERDICT</code> · `nft delete rule FAMILY TABLE CHAIN handle N` · `nft add element FAMILY TABLE SET '{ … }'` |
+| **Parameters** | `-c` check only · `-a` show handles · `type filter hook input priority filter; policy drop;` · `ct state established,related accept` · `counter` · `log prefix "…"` with `limit rate 5/minute` · `reject with tcp reset` · `flush ruleset` at the top of a restore file |
+| **Example** | `sudo nft -c -f /srv/lab18/lab18.nft && sudo nft -f /srv/lab18/lab18.nft` |
+| **Expected output** | `/tmp/bad.nft:21:37-43: Error: syntax error, unexpected comment` for a typo; `tcp dport 443 counter packets 1 bytes 60 accept comment "HTTPS for everyone" # handle 11` (captured, Day 18) |
+| **Equivalent** | `New-NetFirewallRule` / `netsh advfirewall import` (whole policy) |
+| **Common errors** | `Error: Could not process rule: No such file or directory` (wrong table/chain/handle) · restoring a dump without `flush ruleset` (duplicates) · enabling nftables.service next to ufw or firewalld |
+| **Use case** | Complex host policies kept in version control and loaded atomically after `nft -c`. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/nft.8.html> |
+
+### iptables / iptables-save / iptables-restore
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux; Ubuntu 24.04 `iptables` = iptables-nft 1.8.10 (`iptables -V` → `(nf_tables)`); `iptables-legacy` also available — do not mix |
+| **Description** | Classic rule syntax: fixed tables (`filter`, `nat`, `mangle`, `raw`, `security`) with built-in chains (`INPUT`, `FORWARD`, `OUTPUT`, `PREROUTING`, `POSTROUTING`) and policies. Rules are not persistent without a manager. |
+| **Syntax** | <code>iptables [-t T] -L [CHAIN] [-n] [-v] [--line-numbers] &#124; -S [CHAIN]</code> · <code>iptables -A&#124;-I CHAIN [N] [-p P] [-s SRC] [--dport N] [-m conntrack --ctstate S] -j ACCEPT&#124;DROP&#124;REJECT</code> · `iptables -D CHAIN N` · `iptables -P CHAIN DROP` · `iptables-save > F` · `iptables-restore --test < F` |
+| **Parameters** | `-n` numeric · `-v` counters · `--line-numbers` · `-S` rules as commands · `-I INPUT 3` insert · `-P` policy (set last) · `--test` check only |
+| **Example** | `sudo iptables -L ufw-user-input -n -v --line-numbers` |
+| **Expected output** | `2  3  180 ACCEPT  6  --  *  *  0.0.0.0/0  0.0.0.0/0  tcp dpt:9100` (captured; `prot` shows protocol numbers, 6 = TCP) |
+| **Equivalent** | `Get-NetFirewallRule` + `Get-NetFirewallPortFilter` · `netsh advfirewall export` |
+| **Common errors** | `iptables -P INPUT DROP` before the allow rules (lockout) · `iptables: Bad rule (does a matching rule exist in that chain?)` on `-D` · rules gone after reboot · empty `-L` because rules are in iptables-legacy or a native nft table |
+| **Use case** | Reading what ufw, Docker or firewalld generated; counters that show which rule matched. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/iptables.8.html> · <https://man7.org/linux/man-pages/man8/iptables-save.8.html> · <https://man7.org/linux/man-pages/man8/iptables-restore.8.html> |
+
+### conntrack
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux (package conntrack, conntrack-tools 1.4.8 on Ubuntu 24.04); root |
+| **Description** | Lists, counts, watches and deletes entries of the kernel's connection-tracking table (the basis of stateful filtering). Dropped first packets never create an entry. |
+| **Syntax** | <code>conntrack -L&#124;-C&#124;-E&#124;-D [-p PROTO] [-s SRC] [-d DST] [--dport N] [--state STATE] [-o extended]</code> |
+| **Parameters** | `-L` list · `-C` count · `-E` live events · `-D -s ADDR` delete flows (after blocking an attacker) · TCP states `ESTABLISHED`, `TIME_WAIT`, `CLOSE_WAIT`; flag `[ASSURED]` |
+| **Example** | `sudo conntrack -L -p tcp --dport 443` |
+| **Expected output** | `tcp  6 431999 ESTABLISHED src=10.18.0.100 dst=10.18.0.10 sport=50736 dport=443 src=10.18.0.10 dst=10.18.0.100 sport=443 dport=50736 [ASSURED] mark=0 use=1` (captured) |
+| **Equivalent** | No direct equivalent (WFP state is internal); `Get-NetTCPConnection` shows sockets |
+| **Common errors** | `conntrack: command not found` (install the package) · expecting blocked attempts to appear · forgetting that existing flows survive a new block rule |
+| **Use case** | Cutting an attacker's already-open session after `ufw insert 1 deny from …`. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/conntrack.8.html> |
+
+### firewall-cmd (firewalld, RHEL family)
+
+| Field | Detail |
+|---|---|
+| **OS** | RHEL, Rocky, Alma, Fedora, SUSE (firewalld enabled by default); **not** used on Ubuntu by default |
+| **Description** | Client for the firewalld daemon: zones per interface, services and ports per zone, runtime vs permanent configuration, nftables back end. |
+| **Syntax** | `firewall-cmd --state` · `--get-active-zones` · `--zone=Z --list-all` · <code>--add-service=S [--permanent &#124; --timeout=5m]</code> (one or the other) · `--add-rich-rule='…'` · `--reload` · `--runtime-to-permanent` |
+| **Parameters** | Runtime changes are lost on `--reload` unless made `--permanent`; `--timeout` makes a runtime change expire (built-in rollback) |
+| **Example** | `sudo firewall-cmd --zone=public --add-service=https --permanent && sudo firewall-cmd --reload` |
+| **Expected output** | `success` (example) |
+| **Equivalent** | `ufw allow 443/tcp` · `New-NetFirewallRule … -LocalPort 443` |
+| **Common errors** | Forgetting `--permanent` (rule gone after reload) or `--reload` (permanent rule not active yet) · interface in the wrong zone |
+| **Use case** | Opening a service on a RHEL-family server the supported way. |
+| **Docs** | <https://firewalld.org/documentation/man-pages/firewall-cmd.html> |
+
+### Timed rollback (systemd-run) and port tests (nc, nmap)
+
+| Field | Detail |
+|---|---|
+| **OS** | `systemd-run`: systemd hosts (not containers/WSL without systemd) · `nc`: netcat-openbsd · `nmap`: package nmap (7.94SVN on 24.04) |
+| **Description** | `systemd-run --on-active=` schedules a one-shot restore that you cancel once a new session proves the change; `nc -zv` and `nmap -sT` test a policy from each client: open / refused (closed) / timed out (filtered). |
+| **Syntax** | `systemd-run --on-active=5m --unit=NAME COMMAND…` · `systemctl stop NAME.timer` · `nc -zv -w 2 HOST PORT` · `nmap -sT -Pn -p PORTS HOST` |
+| **Parameters** | `--unit=fw-rollback` predictable name · `-w 2` timeout · `-sT` connect scan (no root), `-sS` SYN scan (root) · `-Pn` no host discovery |
+| **Example** | `sudo systemd-run --on-active=5m --unit=fw-rollback /usr/sbin/nft -f /root/fw-known-good.nft` |
+| **Expected output** | `Running timer as unit: fw-rollback.timer` (example) · `22/tcp filtered ssh` / `8080/tcp closed http-proxy` / `443/tcp open https` (captured nmap) |
+| **Equivalent** | Scheduled task running `netsh advfirewall import` · `Test-NetConnection HOST -Port N` |
+| **Common errors** | Testing from the server itself (loopback) · scanning hosts you are not authorised to test · forgetting to cancel the timer |
+| **Use case** | Any remote firewall change; the evidence matrix for a change ticket. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/systemd-run.1.html> · <https://nmap.org/book/man-port-scanning-basics.html> |

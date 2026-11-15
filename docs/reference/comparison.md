@@ -370,3 +370,58 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Legacy cmdlet | — | `Get-EventLog` (**5.1 only**) | Port to `Get-WinEvent` |
 | PowerShell 7 on Linux | <code>journalctl -o json &#124; ForEach-Object { $_ &#124; ConvertFrom-Json }</code> | — | No `Get-WinEvent` on Linux |
 | Daily summary script | `log-analyser.sh -s 24 -n 10 -c 50` | `Log-Analyser.ps1 -Hours 24 -Top 10 -MaxErrors 50` | Exit 3 = too many errors |
+
+## Authentication
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Who is logged in now | `who` · `w` | `quser` · `query user` | utmp vs session manager |
+| Login history | `last -F` | `Get-WinEvent -FilterHashtable @{LogName='Security';Id=4624}` | wtmp vs Security log |
+| Failed logins | `sudo lastb` · `auth.log` | `Get-WinEvent … Id=4625` | btmp vs Security log |
+| Most recent login / account | `lastlog` · `lastlog -b 90` | <code>Get-LocalUser &#124; Select Name,LastLogon</code> | `lastlog`→`lastlog2` on newer distros |
+| Why a login failed | `Failed password` vs `invalid user` | SubStatus `0xC000006A` vs `0xC0000064` | wrong password vs no such user |
+| Account locked out | `faillock --user U` | SubStatus `0xC0000234` · event 4740 | not default on Ubuntu |
+| Account disabled | `/etc/shadow` `!`/expiry | SubStatus `0xC0000072` | |
+| How a login happened | `Accepted password`/`publickey` | 4624 LogonType 2/3/10 | type = access path |
+| Privileged-action trail | `journalctl -t sudo` (`COMMAND=`) | event 4672 + audited actions | |
+| Failed escalation | `FAILED SU` · `NOT in sudoers` | elevated 4625 / 4673 | |
+| Current privileges | `id` · `sudo -l` | `whoami /groups /priv` | |
+| Effective auth config | `sudo sshd -T` | `auditpol /get /category:*` | service vs audit layer |
+| Lockout policy | `faillock.conf` (`deny`,`unlock_time`) | `net accounts` | |
+| Reset a lockout | `sudo faillock --user U --reset` | `net user U` (local) · `Unlock-ADAccount` (AD) | |
+| Enable lockout | add `pam_faillock.so` to PAM | Group Policy account lockout | |
+| Rank attacker IPs | <code>grep … &#124; awk &#124; sort &#124; uniq -c</code> | `Group-Object` on EventData IpAddress | |
+| Count failures reliably | <code>journalctl _COMM=sshd -g 'Failed password' &#124; wc -l</code> | `Get-WinEvent … Id=4625` count | journal avoids repeat-folding |
+| Bound the time window | `journalctl --since "…"` | `-FilterHashtable @{…;StartTime=…}` | always bound |
+| Export for evidence | `cp -p auth.log` + `sha256sum` | `wevtutil epl Security f.evtx` + `Get-FileHash` | Day 16 |
+| Daily report | `failed-login-report.sh` | `Failed-Login-Report.ps1` | exit 3 = alert |
+| Harden auth | `PasswordAuthentication no` (keys) | enforce MFA / smart card | removes password guessing |
+
+## Firewall
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Is the firewall on? | `sudo ufw status verbose` | `Get-NetFirewallProfile -PolicyStore ActiveStore` | Windows: per profile |
+| Which network "trust level"? | Interface / zone (firewalld) | `Get-NetConnectionProfile` (category → profile) | |
+| List rules | `sudo ufw status numbered` · `sudo nft list ruleset` · `sudo iptables -S` | `Get-NetFirewallRule -Enabled True -Direction Inbound` | |
+| Ports and addresses of a rule | Part of the rule text | <code>Get-NetFirewallRule … &#124; Get-NetFirewallPortFilter</code> / `Get-NetFirewallAddressFilter` | |
+| Which rule opens port 3389 / 22? | `sudo ufw show listening` | <code>Get-NetFirewallPortFilter &#124; Where-Object LocalPort -eq 3389 &#124; Get-NetFirewallRule</code> | |
+| Default deny inbound | `sudo ufw default deny incoming` · nft `policy drop;` | `Set-NetFirewallProfile -DefaultInboundAction Block` (default) | |
+| Allow a port from one subnet | `sudo ufw allow from 10.18.0.16/28 to any port 22 proto tcp` | `New-NetFirewallRule -Direction Inbound -Protocol TCP -LocalPort 22 -RemoteAddress 10.18.0.16/28 -Action Allow` | |
+| Allow one program | — (no program match for inbound) | `New-NetFirewallRule -Program C:\App\app.exe` | |
+| Block one address | `sudo ufw insert 1 deny from ADDR` | `New-NetFirewallRule -RemoteAddress ADDR -Action Block` | |
+| Rule order | First match wins | Block > Allow > default | |
+| Refuse quickly instead of drop | `sudo ufw reject 8080/tcp` · nft `reject with tcp reset` | — (Block always drops) | |
+| Rate-limit new connections | `sudo ufw limit OpenSSH` · nft `limit rate` | — | |
+| Switch a rule off | Delete it (or comment it out in the nft file) | `Disable-NetFirewallRule` | |
+| Delete a rule | `sudo ufw delete N` (prompts) · `nft delete rule … handle N` | `Remove-NetFirewallRule -DisplayName X -WhatIf` | Preview first |
+| Preview / check | `sudo ufw --dry-run …` · `sudo nft -c -f FILE` · `iptables-restore --test` | `-WhatIf` | |
+| Back up | `sudo tar -C /etc -czf ufw.tgz ufw` · `sudo nft list ruleset > f` · `sudo iptables-save > f` | `netsh advfirewall export f.wfw` | |
+| Restore | `tar -xzf … && ufw reload` · `nft -f f` (with `flush ruleset`) · `iptables-restore < f` | `netsh advfirewall import f.wfw` | Full replace |
+| Timed rollback | `sudo systemd-run --on-active=5m --unit=fw-rollback …` | Scheduled task running `netsh advfirewall import` | Cancel after a new session works |
+| Log dropped packets | `sudo ufw logging low` → `journalctl -k`, `/var/log/ufw.log` | `Set-NetFirewallProfile -LogBlocked True` → `pfirewall.log` | |
+| Security events | `journalctl -k -g 'UFW BLOCK'` | Security 5152 / 5157 (audit policy) | |
+| Rule hit counters | `iptables -L -n -v` · nft `counter` | — | Use logs on Windows |
+| Connection state table | `sudo conntrack -L` | — (internal to WFP) | |
+| Test a port from a client | `nc -zv -w 2 HOST PORT` · `nmap -sT -Pn -p P HOST` | `Test-NetConnection HOST -Port P` | Own/authorised hosts only |
+| RHEL family | `firewall-cmd --add-service=https --permanent && firewall-cmd --reload` | — | |

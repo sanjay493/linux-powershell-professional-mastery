@@ -1,14 +1,14 @@
 # Development Status
 
-**Last updated:** 2026-11-14 · **Last release:** 2026-11-14 22:00 IST nightly (Days 15–16, v0.8.0) · **Next release:** 2026-11-15 22:00 IST (Days 17–18)
+**Last updated:** 2026-11-15 · **Last release:** 2026-11-15 22:00 IST nightly (Days 17–18, v0.9.0) · **Next release:** 2026-11-16 22:00 IST (Days 19–20)
 
 ## Phase tracker
 
 | Phase | Status | Notes |
 |---|---|---|
 | 1. Inspection & planning | Done | Tools checked; `course-plan.yml` is the curriculum and schedule |
-| 2. Course content | In progress | Days 01–16 published, Module 1, 2 and 3 tests released, Module 4 in progress; two days per night at 22:00 IST |
-| 3. Scripts | In progress | `system-info`, `process-monitor`, `disk-monitor`, `dns-check`, `port-monitor`, `network-diagnostic` and `log-analyser` (Bash + PowerShell) done; others ship with their days |
+| 2. Course content | In progress | Days 01–18 published, Module 1, 2 and 3 tests released, Module 4 in progress; two days per night at 22:00 IST |
+| 3. Scripts | In progress | `system-info`, `process-monitor`, `disk-monitor`, `dns-check`, `port-monitor`, `network-diagnostic`, `log-analyser` and `failed-login-report` (Bash + PowerShell) done; others ship with their days |
 | 4. Website | Done | MkDocs Material, nav markers for appending, search, dark/light theme |
 | 5. Handbooks (PDF) | Done (pipeline) | Rebuilt every release; topic PDFs appear when their modules are complete |
 | 6. Testing | Done (pipeline) | check_course, markdownlint, ShellCheck, PSScriptAnalyzer, script execution, PDF validation, strict build |
@@ -35,7 +35,9 @@
 | 14 | Ports, Sockets and Connections | Published | Published | port-monitor.sh, Port-Monitor.ps1 |
 | 15 | Network Interfaces and Diagnostics | Published | Published | network-diagnostic.sh, Network-Diagnostic.ps1, Module 3 test, Networking guide PDF |
 | 16 | System Logs | Published | Published | log-analyser.sh, Log-Analyser.ps1 |
-| 17–30 | See `course-plan.yml` | Planned | Planned | Per plan |
+| 17 | Authentication and Security Monitoring | Published | Published | failed-login-report.sh, Failed-Login-Report.ps1 |
+| 18 | Firewall Management | Published | Published | — |
+| 19–30 | See `course-plan.yml` | Planned | Planned | Per plan |
 
 ## Validation record
 
@@ -75,6 +77,12 @@
 | Day 16 and Lab 16 Bash demo output | Generated on 2026-11-14 by running the commands as root on Ubuntu 24.04.5 in a container with `systemd-journald` and `rsyslogd` started by hand from Ubuntu's configuration (no systemd as PID 1): RFC 3339 syslog timestamps, journal → rsyslog forwarding, `journalctl` filters, priorities, `-g`, output formats and trusted fields, `--disk-usage`/`--verify`, `dmesg` and `dmesg_restrict` behaviour, `logger`, permission errors for non-members of `adm`, `zgrep` on rotated logs, `logrotate -d` and real rotations of a lab-only configuration; every Lab 16 task ran end to end (the generated evidence files are deterministic and their SHA-256 hashes are listed in the lab) | Unit (`-u`) and previous-boot (`-b -1`) output on a booted systemd host, `systemd-run` reviewed against journalctl(1)/journald.conf(5) | Labelled as examples |
 | Day 16, Lab 16 PowerShell/Windows content, `Log-Analyser.ps1` | — | `Get-WinEvent` (`-ListLog`, `-FilterHashtable` keys, `-FilterXPath`, `-Path`), `Get-EventLog` (5.1 only), `wevtutil`, `eventcreate`, `New-WinEvent` and event IDs reviewed from knowledge of the official documentation (learn.microsoft.com not reachable from the release host) | **Not executed** (no PowerShell on the release host); CI runs the script with 5.1 and 7 and PSScriptAnalyzer |
 | `log-analyser.sh` | Executed in the container: journal source (0, and 3 with `-c 3`), RFC 3339 and classic-format test files incl. lines outside the window, `.gz`, `-s 0`, `-f csv`, `-o`, syslog/auth.log fallback without `journalctl`, as `nobody` with no readable source (n/a, 0) and with a readable file above the threshold (3), invalid input (1), unwritable `-o` (2) | `bash -n`; ShellCheck 0.11.0 clean at `-S style` | Full run on a GitHub `ubuntu-24.04` runner in CI |
+| Day 17 and Lab 17 Bash demo output | Generated on 2026-11-15 as root on Ubuntu 24.04.5 in a container (OpenSSH 9.6p1, sudo 1.9.15p5, util-linux `su`/`last`, `lastlog`, `faillock`) with `systemd-journald`, `rsyslogd` and `sshd` started by hand and throwaway `lab17-*` accounts: real sshd Failed/Accepted/Invalid-user/`[preauth]`/max-auth-tries lines, `sshd -T` defaults, sudo *NOT in sudoers* and *incorrect password attempts*, `FAILED SU`, `who`/`w`/`last`/`lastlog`, a pam_faillock lockout with backup and rollback of the PAM files; the Lab 17 setup, Bash solution and `failed-login-report.sh` ran end to end; all lab users, keys and PAM changes removed afterwards | `ssh.socket` activation and `journalctl -u ssh` on a booted systemd host reviewed against man pages (no systemd as PID 1) | Labelled as examples |
+| Day 17, Lab 17 PowerShell/Windows content | — | Security event IDs 4624/4625/4634/4647/4648/4672/4720–4726/4728/4732/4740/4756/4767/4768/4771/4776/1102, logon types, 4625 Status/SubStatus codes, `auditpol`, `net accounts`, `Get-LocalUser`, `quser` reviewed from knowledge of the official documentation (learn.microsoft.com not reachable from the release host) | Not executed; labelled as examples |
+| `failed-login-report.sh` | Executed in the container: no args (journal source, exit 3 on a success after failure), `-o`, `-f csv`, RFC 3339 and classic test files, `.gz`, `-s 1`, `-t 3`/`-t 100`, as `nobody` (n/a, exit 0), invalid input (1), unwritable `-o` (2), the Lab 17 dataset | `bash -n`; ShellCheck 0.9.0 clean at `-S style` | Full run on a GitHub `ubuntu-24.04` runner in CI |
+| `Failed-Login-Report.ps1` | — | Written for StrictMode/5.1/7; PSScriptAnalyzer and execution with 5.1 and 7 in CI | **Not executed before release**: installing PowerShell was not permitted on the release host |
+| Day 18 and Lab 18 Bash demo output | Generated on 2026-11-15 as root on Ubuntu 24.04.5 in a container inside `lab18-*` network namespaces (ufw 0.36.2, iptables 1.8.10 nf_tables, nftables 1.0.9, conntrack-tools 1.4.8, Nmap 7.94SVN, netcat-openbsd, curl): ufw defaults/allow/deny/reject/limit/numbered delete/`--dry-run`, real `[UFW BLOCK]` lines (with `net.netfilter.nf_log_all_netns=1` set temporarily and reset), `iptables -L -n -v`/`-S`/save/restore, `nft list ruleset`, handles and `nft -c -f`, conntrack states, reject vs drop from clients, nmap open/closed/filtered; the Lab 18 setup, test matrix, fault round, Bash solution and clean-up ran end to end (`/etc/ufw` restored byte for byte) | IPv6 `(v6)` rules and `systemd-run` timed rollback reviewed against man pages (no IPv6 or systemd in the container); firewalld against Red Hat documentation | Labelled as examples |
+| Day 18, Lab 18 PowerShell/Windows content | — | NetSecurity cmdlets (`Get-NetFirewallProfile`, `Get-NetFirewallRule` and filter cmdlets, `New-`/`Set-`/`Disable-`/`Remove-`/`Copy-NetFirewallRule`, `-PolicyStore`), `Get-/Set-NetConnectionProfile`, `netsh advfirewall export/import`, pfirewall.log format and WFP audit events 5152/5156/5157 reviewed from knowledge of the official documentation (learn.microsoft.com not reachable; the pfirewall.log `pid` field and operational-log event IDs should be re-checked) | Not executed; labelled as examples |
 | Module 3 test | — | Questions checked against the Day 11–15 lessons | Q25 practical not executed |
 | PDFs | Built and validated in CI (WeasyPrint needs Pango, which this Windows host lacks) | — | Not built locally |
 
@@ -96,7 +104,9 @@ The full topic list for each day is in `docs/course/index.md` (key commands) and
 - **Day 14** Ports, sockets and connections (published 2026-11-13): port ranges, TCP states, binding addresses, `ss`, `netstat`, `lsof -i`, `fuser`, `/proc/net/tcp`; `Get-NetTCPConnection`, `Get-NetUDPEndpoint`, `netstat -ano`, `tasklist /svc`, dynamic port ranges; ships `port-monitor` scripts.
 - **Day 15** Network interfaces and diagnostics (published 2026-11-14): link flags, `ip -s -s link`, `ethtool`, neighbour states, `arping -D`, MTU black holes, `tcpdump`/BPF, `tshark`/Wireshark filters; `Get-NetAdapter`, `Get-NetAdapterStatistics`, `Get-NetNeighbor`, `pktmon`; ships `network-diagnostic` scripts and the Module 3 test.
 - **Day 16** System logs (published 2026-11-14): journald, rsyslog, `/var/log`, severities, `journalctl`, `dmesg`, `logger`, `logrotate`; `Get-WinEvent -FilterHashtable`, `Get-EventLog` (5.1), `wevtutil`, event IDs; ships `log-analyser` scripts.
-- **Days 17–30:** as listed in `docs/course/index.md` and the course specification sections for Modules 4–6. Day 17 should build on the auth.log and failed-login teasers of Day 16 and Lab 16.
+- **Day 17** Authentication and security monitoring (published 2026-11-15): sshd/sudo/su/PAM log lines, `sshd -T`, `who`/`w`/`last`/`lastb`/`lastlog`, `faillock`; Security events 4624/4625 (logon types, SubStatus), 4740, `auditpol`, `net accounts`; ships `failed-login-report` scripts.
+- **Day 18** Firewall management (published 2026-11-15): conntrack, netfilter, `nft`, `iptables`, `ufw`, lockout prevention, testing with `nc`/`nmap`; Windows Defender Firewall profiles, `Get-/New-/Remove-NetFirewallRule`, `netsh advfirewall export/import`, pfirewall.log.
+- **Days 19–30:** as listed in `docs/course/index.md` and the course specification sections for Modules 4–6. Day 19 (System Security Auditing) can build on Day 17's `sshd -T`/`auditpol` and Day 18's firewall review; Day 20 ships the Module 4 test and the Cybersecurity reference PDF.
 
 ## Hosting decision
 

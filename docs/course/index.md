@@ -44,8 +44,8 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 | Day | Lesson | Key commands |
 |---|---|---|
 | 16 | [System Logs](module-4/day-16.md) | `journalctl` `dmesg` `/var/log` · `Get-WinEvent` `wevtutil` |
-| 17 | Authentication and Security Monitoring | `last` `lastb` `who` · auth.log · Security log event IDs 4624/4625/4672 |
-| 18 | Firewall Management | `ufw` `nft` `iptables` · `Get-NetFirewallProfile` `Get-NetFirewallRule` |
+| 17 | [Authentication and Security Monitoring](module-4/day-17.md) | `last` `lastb` `who` · auth.log · Security log event IDs 4624/4625/4672 |
+| 18 | [Firewall Management](module-4/day-18.md) | `ufw` `nft` `iptables` · `Get-NetFirewallProfile` `Get-NetFirewallRule` |
 | 19 | System Security Auditing | `sudo -l` `find -perm` · `Get-ExecutionPolicy` `Get-MpComputerStatus` |
 | 20 | Network Security Investigation | `nmap` `ss` `tcpdump` · `Get-NetTCPConnection` `pktmon` |
 

@@ -63,6 +63,8 @@ A searchable reference for every command taught in the course. Use the **search 
 | Networking: ports & sockets | :material-check: | :material-check: | Day 14 |
 | Interfaces & packet capture | :material-check: | :material-check: | Day 15 |
 | Logs | :material-check: | :material-check: | Day 16 |
-| Authentication, security, firewall | Days 17–20 | Days 17–20 | |
+| Authentication | :material-check: | :material-check: | Day 17 |
+| Firewall | :material-check: | :material-check: | Day 18 |
+| Security auditing & investigation | Days 19–20 | Days 19–20 | |
 | Scripting & automation | Days 21–25 | Days 21–25 | |
 | Remote administration | Day 26 | Day 26 | |

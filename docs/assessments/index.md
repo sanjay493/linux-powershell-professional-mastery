@@ -26,6 +26,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 14 | [Ports, Sockets and Connections](../course/module-3/day-14.md#quiz) |
 | 15 | [Network Interfaces and Diagnostics](../course/module-3/day-15.md#quiz) |
 | 16 | [System Logs](../course/module-4/day-16.md#quiz) |
+| 17 | [Authentication and Security Monitoring](../course/module-4/day-17.md#quiz) |
+| 18 | [Firewall Management](../course/module-4/day-18.md#quiz) |
 
 ## Module tests
 
