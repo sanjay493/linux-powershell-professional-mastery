@@ -357,7 +357,7 @@ elseif ($overThreshold.Count -gt 0 -or $successAfterFailure.Count -gt 0) { $stat
 $summary = [ordered]@{
     'Report time (UTC)'         = $timestamp
     'Computer'                  = $computerName
-    'PowerShell'                = '{0} {1}' -f $PSVersionTable.PSEdition, $PSVersionTable.PSVersion
+    'PowerShell'                = ('{0} {1}' -f $PSVersionTable.PSEdition, $PSVersionTable.PSVersion)
     'Source'                    = $sourceText
     'Source status'             = $sourceStatus
     'Window'                    = $(if ($startTime) { 'last {0} h (since {1:yyyy-MM-dd HH:mm:ss} local time)' -f $Hours, $startTime } else { 'all entries' })
@@ -368,7 +368,7 @@ $summary = [ordered]@{
     'sudo NOT in sudoers'       = $sudoNotInSudoers.Count
     'su failures'               = $suFails.Count
     'Distinct failing addresses' = $byAddress.Count
-    'Addresses over threshold'  = '{0} (threshold {1})' -f $overThreshold.Count, $Threshold
+    'Addresses over threshold'  = ('{0} (threshold {1})' -f $overThreshold.Count, $Threshold)
     'Success after failure'     = $successAfterFailure.Count
     'Truncated'                 = $(if ($truncated) { "yes (first $maxEvents events only)" } else { 'no' })
     'Status'                    = $status
@@ -423,12 +423,12 @@ switch ($Format) {
         }
         $rows.Add([pscustomobject]@{ Section = 'summary'; Item = 'threshold'; Count = $Threshold })
         $rows.Add([pscustomobject]@{ Section = 'summary'; Item = "source: $sourceText"; Count = $sourceStatus })
-        foreach ($a in ($byAddress | Select-Object -First $Top)) { $rows.Add([pscustomobject]@{ Section = 'source_address'; Item = '{0} ({1} accounts)' -f $a.Address, $a.Accounts; Count = $a.Failures }) }
+        foreach ($a in ($byAddress | Select-Object -First $Top)) { $rows.Add([pscustomobject]@{ Section = 'source_address'; Item = ('{0} ({1} accounts)' -f $a.Address, $a.Accounts); Count = $a.Failures }) }
         foreach ($u in $byAccount) { $rows.Add([pscustomobject]@{ Section = 'account'; Item = $u.Account; Count = $u.Count }) }
         foreach ($r in $byReason) { $rows.Add([pscustomobject]@{ Section = 'reason'; Item = $r.Reason; Count = $r.Count }) }
         foreach ($t in $byFailType) { $rows.Add([pscustomobject]@{ Section = 'failed_logon_type'; Item = $t.LogonType; Count = $t.Count }) }
         foreach ($t in $bySuccessType) { $rows.Add([pscustomobject]@{ Section = 'success_logon_type'; Item = $t.LogonType; Count = $t.Count }) }
-        foreach ($s in $successAfterFailure) { $rows.Add([pscustomobject]@{ Section = 'success_after_failure'; Item = '{0} {1} user={2}' -f $s.Time, $s.Address, $s.Account; Count = $s.FailuresByAddress }) }
+        foreach ($s in $successAfterFailure) { $rows.Add([pscustomobject]@{ Section = 'success_after_failure'; Item = ('{0} {1} user={2}' -f $s.Time, $s.Address, $s.Account); Count = $s.FailuresByAddress }) }
         $output = ($rows | Select-Object @{ n = 'TimestampUtc'; e = { $timestamp } }, @{ n = 'Computer'; e = { $computerName } }, Section, Item, Count |
                 ConvertTo-Csv -NoTypeInformation) -join [Environment]::NewLine
         $extension = 'csv'
