@@ -59,8 +59,8 @@ days:
   - {day: 17, module: module-4, release: 2026-11-15, status: published, title: "Authentication and Security Monitoring",
      extras: ["scripts/linux/failed-login-report.sh", "scripts/powershell/Failed-Login-Report.ps1"]}
   - {day: 18, module: module-4, release: 2026-11-15, status: published, title: "Firewall Management"}
-  - {day: 19, module: module-4, release: 2026-11-16, status: planned, title: "System Security Auditing"}
-  - {day: 20, module: module-4, release: 2026-11-16, status: planned, title: "Network Security Investigation",
+  - {day: 19, module: module-4, release: 2026-11-16, status: published, title: "System Security Auditing"}
+  - {day: 20, module: module-4, release: 2026-11-16, status: published, title: "Network Security Investigation",
      extras: ["docs/assessments/module-4-test.md", "pdf: Cybersecurity-Command-Reference.pdf"]}
   - {day: 21, module: module-5, release: 2026-11-17, status: planned, title: "Variables and User Input"}
   - {day: 22, module: module-5, release: 2026-11-17, status: planned, title: "Conditions and Loops"}

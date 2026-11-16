@@ -1,13 +1,13 @@
 # Development Status
 
-**Last updated:** 2026-11-15 · **Last release:** 2026-11-15 22:00 IST nightly (Days 17–18, v0.9.0) · **Next release:** 2026-11-16 22:00 IST (Days 19–20)
+**Last updated:** 2026-11-16 · **Last release:** 2026-11-16 22:00 IST nightly (Days 19–20, v0.10.0, Module 4 complete) · **Next release:** 2026-11-17 22:00 IST (Days 21–22)
 
 ## Phase tracker
 
 | Phase | Status | Notes |
 |---|---|---|
 | 1. Inspection & planning | Done | Tools checked; `course-plan.yml` is the curriculum and schedule |
-| 2. Course content | In progress | Days 01–18 published, Module 1, 2 and 3 tests released, Module 4 in progress; two days per night at 22:00 IST |
+| 2. Course content | In progress | Days 01–20 published, Modules 1–4 complete (all four module tests released); Module 5 next; two days per night at 22:00 IST |
 | 3. Scripts | In progress | `system-info`, `process-monitor`, `disk-monitor`, `dns-check`, `port-monitor`, `network-diagnostic`, `log-analyser` and `failed-login-report` (Bash + PowerShell) done; others ship with their days |
 | 4. Website | Done | MkDocs Material, nav markers for appending, search, dark/light theme |
 | 5. Handbooks (PDF) | Done (pipeline) | Rebuilt every release; topic PDFs appear when their modules are complete |
@@ -37,7 +37,9 @@
 | 16 | System Logs | Published | Published | log-analyser.sh, Log-Analyser.ps1 |
 | 17 | Authentication and Security Monitoring | Published | Published | failed-login-report.sh, Failed-Login-Report.ps1 |
 | 18 | Firewall Management | Published | Published | — |
-| 19–30 | See `course-plan.yml` | Planned | Planned | Per plan |
+| 19 | System Security Auditing | Published | Published | — |
+| 20 | Network Security Investigation | Published | Published | Module 4 test, Cybersecurity reference PDF |
+| 21–30 | See `course-plan.yml` | Planned | Planned | Per plan |
 
 ## Validation record
 
@@ -84,7 +86,12 @@
 | Day 18 and Lab 18 Bash demo output | Generated on 2026-11-15 as root on Ubuntu 24.04.5 in a container inside `lab18-*` network namespaces (ufw 0.36.2, iptables 1.8.10 nf_tables, nftables 1.0.9, conntrack-tools 1.4.8, Nmap 7.94SVN, netcat-openbsd, curl): ufw defaults/allow/deny/reject/limit/numbered delete/`--dry-run`, real `[UFW BLOCK]` lines (with `net.netfilter.nf_log_all_netns=1` set temporarily and reset), `iptables -L -n -v`/`-S`/save/restore, `nft list ruleset`, handles and `nft -c -f`, conntrack states, reject vs drop from clients, nmap open/closed/filtered; the Lab 18 setup, test matrix, fault round, Bash solution and clean-up ran end to end (`/etc/ufw` restored byte for byte) | IPv6 `(v6)` rules and `systemd-run` timed rollback reviewed against man pages (no IPv6 or systemd in the container); firewalld against Red Hat documentation | Labelled as examples |
 | Day 18, Lab 18 PowerShell/Windows content | — | NetSecurity cmdlets (`Get-NetFirewallProfile`, `Get-NetFirewallRule` and filter cmdlets, `New-`/`Set-`/`Disable-`/`Remove-`/`Copy-NetFirewallRule`, `-PolicyStore`), `Get-/Set-NetConnectionProfile`, `netsh advfirewall export/import`, pfirewall.log format and WFP audit events 5152/5156/5157 reviewed from knowledge of the official documentation (learn.microsoft.com not reachable; the pfirewall.log `pid` field and operational-log event IDs should be re-checked) | Not executed; labelled as examples |
 | Module 3 test | — | Questions checked against the Day 11–15 lessons | Q25 practical not executed |
-| PDFs | Built and validated in CI (WeasyPrint needs Pango, which this Windows host lacks) | — | Not built locally |
+| Day 19 and Lab 19 Bash demo output | Generated on 2026-11-16 as root on Ubuntu 24.04.5 in a container: the `lab19-setup.sh` / `lab19-audit.sh` / `lab19-cleanup.sh` cycle ran end to end (seven planted findings — stale `chage` account, intern in `sudo`, `NOPASSWD: /usr/bin/find`, SUID-root `sysinfo-helper` with `dpkg -S` "no path found", world-writable `nightly-backup.sh`, UID 4719 orphan, `cap_net_raw` `net-probe`), captured with `awk` on passwd/shadow, `chage -l`, `passwd -S`, `getent group`, `sudo -l -U`, `visudo -c`, `find -perm -4000`/`-0002`/`-nouser`, `getcap -r`, `stat`, `sysctl`, `getent`/`login.defs`; the clean-up restored the SUID, capability and sudo-group lists to the pre-setup baseline (verified by `diff`). `lab19-setup.sh`, `lab19-audit.sh` and `lab19-cleanup.sh` are `bash -n`- and ShellCheck 0.9.0-clean. | `sudo -l -U` *incorrect password* interactivity and other-user ageing re-confirmed against sudoers(5)/shadow(5) | Labelled as examples |
+| Day 19, Lab 19 PowerShell/Windows content | — | `Get-ExecutionPolicy`/`Set-ExecutionPolicy` and `about_Execution_Policies` (defence-in-depth note, client `Restricted` vs server `RemoteSigned`, non-Windows fixed `Unrestricted`), `Get-MpComputerStatus`/`Get-MpPreference`/`Get-MpThreatDetection` fields, `Get-FileHash`, `Get-AuthenticodeSignature`, `Get-BitLockerVolume`, `Confirm-SecureBootUEFI`, `Get-SmbServerConfiguration` (EnableSMB1Protocol), `about_Logging_Windows` (event 4104) checked against the MicrosoftDocs PowerShell-Docs and windows-powershell-docs sources (learn.microsoft.com not reachable from the release host) | **Not executed** (no PowerShell on the release host); Windows output labelled as examples |
+| Day 20 and Lab 20 Bash/network content | `lsof -nP -i` confirmed on the release host; the Lab 20 setup/clean-up scripts are `bash -n`-clean | `nmap` options (`-sn`/`-sT`/`-sS`/`-sV`/`-O`/`--reason`/`--open`/`-p`/`--top-ports`/`-oA`, states, `scanme.nmap.org` authorisation), `ss`/`lsof` usage and `tcpdump`/`tshark` filters reviewed against the upstream Nmap man page (nmap/nmap docs/nmap.1), the tcpdump man source and the Day 14/15 captures | **Not executed**: `nmap`, `tcpdump`, `ss` and `iproute2` could not be installed on the release host, and scanning is only ever done against `scanme.nmap.org` or an owned lab; all scan/capture output labelled as examples |
+| Day 20, Lab 20 PowerShell/Windows content | — | `Get-NetTCPConnection` (states incl. `OwningProcess`), `Test-NetConnection -Port`, `netstat -anob`, `pktmon start`/`stop`/`etl2pcap` reviewed against the MicrosoftDocs NetTCPIP source and the Day 14 content (learn.microsoft.com not reachable) | Not executed; labelled as examples |
+| Module 4 test | — | Questions checked against the Day 16–20 lessons; the Part C practical uses only commands captured or verified above | Q25 practical not executed as a whole |
+| PDFs | Built and validated in CI (WeasyPrint needs Pango, which this Windows host lacks). The Cybersecurity Command Reference (Days 16–20 + SOC pathway) becomes ready now that Module 4 is complete | — | Not built locally |
 
 ## Curriculum topics (reference for nightly releases)
 
@@ -106,7 +113,9 @@ The full topic list for each day is in `docs/course/index.md` (key commands) and
 - **Day 16** System logs (published 2026-11-14): journald, rsyslog, `/var/log`, severities, `journalctl`, `dmesg`, `logger`, `logrotate`; `Get-WinEvent -FilterHashtable`, `Get-EventLog` (5.1), `wevtutil`, event IDs; ships `log-analyser` scripts.
 - **Day 17** Authentication and security monitoring (published 2026-11-15): sshd/sudo/su/PAM log lines, `sshd -T`, `who`/`w`/`last`/`lastb`/`lastlog`, `faillock`; Security events 4624/4625 (logon types, SubStatus), 4740, `auditpol`, `net accounts`; ships `failed-login-report` scripts.
 - **Day 18** Firewall management (published 2026-11-15): conntrack, netfilter, `nft`, `iptables`, `ufw`, lockout prevention, testing with `nc`/`nmap`; Windows Defender Firewall profiles, `Get-/New-/Remove-NetFirewallRule`, `netsh advfirewall export/import`, pfirewall.log.
-- **Days 19–30:** as listed in `docs/course/index.md` and the course specification sections for Modules 4–6. Day 19 (System Security Auditing) can build on Day 17's `sshd -T`/`auditpol` and Day 18's firewall review; Day 20 ships the Module 4 test and the Cybersecurity reference PDF.
+- **Day 19** System security auditing (published 2026-11-16): account hygiene (`awk` on passwd/shadow, `chage -l`, `passwd -S`), privilege review (`sudo -l -U`, sudoers `NOPASSWD` + shell-escape/GTFOBins, `visudo -c`), SUID/SGID (`find -perm -4000`, baseline diff, `dpkg -S`/`-V`), `getcap`, world-writable/orphaned files, sensitive modes, `sysctl` hardening, `login.defs`; Windows `Get-ExecutionPolicy` (defence in depth), `Get-MpComputerStatus`/`Get-MpPreference`, `Get-LocalGroupMember`, `whoami /priv`, `Get-FileHash`, `Get-AuthenticodeSignature`, `Get-BitLockerVolume`, `Confirm-SecureBootUEFI`, `Get-SmbServerConfiguration`, event 4104; ships Lab 19 with reversible setup/audit/clean-up scripts.
+- **Day 20** Network security investigation (published 2026-11-16): authorised read-only-first workflow; `nmap` (`-sn`/`-sT`/`-sS`/`-sV`/`-O`/`--reason`/`--open`/`-oA`, open/closed/filtered, `scanme.nmap.org`), `ss`/`lsof -i` socket→process→binary mapping, IoCs (backdoor listener, reverse shell, C2 beaconing, DNS tunnelling), `tcpdump`/`tshark` targeted capture, correlation with Days 17–19; Windows `Get-NetTCPConnection`+`OwningProcess`, `Test-NetConnection`, `netstat -anob`, `pktmon`; ships Lab 20 (isolated three-namespace backdoor/beacon lab), the **Module 4 test** and the **Cybersecurity Command Reference** PDF. **Module 4 complete.**
+- **Days 21–30:** as listed in `docs/course/index.md` and the course specification sections for Modules 5–6.
 
 ## Hosting decision
 

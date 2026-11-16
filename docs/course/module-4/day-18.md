@@ -1504,4 +1504,4 @@ Test-NetConnection -ComputerName SERVER -Port 443
 
 ---
 
-**Previous:** [Day 17: Authentication and Security Monitoring](day-17.md) · **Next:** Day 19: System Security Auditing (see the [release schedule](../schedule.md))
+**Previous:** [Day 17: Authentication and Security Monitoring](day-17.md) · **Next:** [Day 19: System Security Auditing](day-19.md)

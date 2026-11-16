@@ -425,3 +425,43 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Connection state table | `sudo conntrack -L` | — (internal to WFP) | |
 | Test a port from a client | `nc -zv -w 2 HOST PORT` · `nmap -sT -Pn -p P HOST` | `Test-NetConnection HOST -Port P` | Own/authorised hosts only |
 | RHEL family | `firewall-cmd --add-service=https --permanent && firewall-cmd --reload` | — | |
+
+## Security auditing
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| UID 0 / admin accounts | `awk -F: '$3==0' /etc/passwd` · `getent group sudo` | `Get-LocalGroupMember Administrators` | Compare to approved list |
+| Empty / non-expiring passwords | `sudo awk -F: '$2==""' /etc/shadow` · `chage -l` | <code>Get-LocalUser &#124; Select PasswordExpires</code> | Shadow needs root |
+| My privileges | `id` · `sudo -l` | `whoami /priv` · `whoami /groups` | |
+| Dangerous privilege grant | `NOPASSWD` + shell-capable cmd (GTFOBins) | ⚠ execution policy is **not** a control | `find`/`vi`/`less` = root |
+| Validate policy file | `visudo -c` | — | Read-only check |
+| SUID / SGID files | `find / -xdev -perm -4000` | — (no SUID model) | Baseline + diff |
+| File capabilities | `getcap -r /` | — | `cap_net_raw` etc. |
+| File integrity | `sha256sum` · `dpkg -V` | `Get-FileHash` | Reputation / tamper |
+| Code signature | `gpg --verify` · `dpkg-sig` | `Get-AuthenticodeSignature` | Signed vs tampered |
+| Downloaded-file mark | — | `Unblock-File` (Mark-of-the-Web) | |
+| World-writable files | `find / -perm -0002` | `icacls` / `Get-Acl` on key paths | |
+| Orphaned files | `find / \( -nouser -o -nogroup \)` | — | Deleted-account files |
+| Disk encryption | `cryptsetup status` (LUKS) | `Get-BitLockerVolume` | |
+| Secure Boot | `mokutil --sb-state` | `Confirm-SecureBootUEFI` | UEFI + elevated |
+| Antivirus state | `systemctl status clamav-*` | `Get-MpComputerStatus` | Defender built in |
+| Legacy protocol off | n/a | `Get-SmbServerConfiguration` (SMB1) | Want `False` |
+| Kernel hardening | `sysctl fs.protected_* kernel.*_restrict` | Security Baselines (registry) | CIS Benchmark |
+| Script/command logging | `auditd` · shell history | event 4104 (script block), 4688 | |
+
+## Network security investigation
+
+| Task | Bash (Ubuntu) | PowerShell (Windows) | Notes |
+|---|---|---|---|
+| Host discovery | `nmap -sn NET` | `Test-Connection -Count 1` | Authorised nets only |
+| Port scan | `nmap -sS -sV TARGET` | `Test-NetConnection -Port` (per port) | No built-in Windows scanner |
+| Open vs closed vs filtered | `nmap --reason` | `TcpTestSucceeded` true/false | filtered = timeout |
+| Listening sockets | `ss -tulpn` | `Get-NetTCPConnection -State Listen` | Day 14 baseline |
+| Established connections | `ss -tanp state established` | `Get-NetTCPConnection -State Established` | |
+| Socket → process | `lsof -i` · `/proc/PID/exe` | `OwningProcess` → `Get-Process -Id` | core skill |
+| Socket → executable | `ls -l /proc/PID/exe` | `netstat -anob` | `(deleted)` = IoC |
+| Capture packets | `tcpdump -n -w f 'host X'` | `pktmon start/stop` + `etl2pcap` | Tight filter |
+| Read a capture | `tshark -r f -Y FILTER` · Wireshark | Wireshark (pcapng) | Display filters |
+| Reverse-lookup an IP | `dig -x IP` · `host IP` | `Resolve-DnsName IP` | Day 13 |
+| Firewall drop log | `journalctl -k -g UFW` | `pfirewall.log`, Security 5157 | Day 18 |
+| Correlate logins | `journalctl _COMM=sshd` | `Get-WinEvent` 4624/4625 | Day 17 |

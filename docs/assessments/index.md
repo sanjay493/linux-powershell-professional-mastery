@@ -28,6 +28,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 16 | [System Logs](../course/module-4/day-16.md#quiz) |
 | 17 | [Authentication and Security Monitoring](../course/module-4/day-17.md#quiz) |
 | 18 | [Firewall Management](../course/module-4/day-18.md#quiz) |
+| 19 | [System Security Auditing](../course/module-4/day-19.md#quiz) |
+| 20 | [Network Security Investigation](../course/module-4/day-20.md#quiz) |
 
 ## Module tests
 
@@ -38,7 +40,7 @@ Each module test (20–25 questions: multiple choice, command-writing and a shor
 | [Module 1 test](module-1-test.md) | Days 1–5 | Available |
 | [Module 2 test](module-2-test.md) | Days 6–10 | Available |
 | [Module 3 test](module-3-test.md) | Days 11–15 | Available |
-| Module 4 test | Days 16–20 | 2026-11-16 22:00 IST |
+| [Module 4 test](module-4-test.md) | Days 16–20 | Available |
 | Module 5 test | Days 21–25 | 2026-11-19 22:00 IST |
 | Module 6 test | Days 26–30 | 2026-11-21 22:00 IST |
 

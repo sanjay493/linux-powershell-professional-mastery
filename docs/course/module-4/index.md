@@ -22,7 +22,7 @@ You will investigate system and security logs, detect suspicious authentication 
 | 16 | [System Logs](day-16.md) | [Lab 16](../../labs/lab-16.md) | Published |
 | 17 | [Authentication and Security Monitoring](day-17.md) | [Lab 17](../../labs/lab-17.md) | Published |
 | 18 | [Firewall Management](day-18.md) | [Lab 18](../../labs/lab-18.md) | Published |
-| 19 | System Security Auditing | Lab 19 | 2026-11-16 22:00 IST |
-| 20 | Network Security Investigation | Lab 20 | 2026-11-16 22:00 IST |
+| 19 | [System Security Auditing](day-19.md) | [Lab 19](../../labs/lab-19.md) | Published |
+| 20 | [Network Security Investigation](day-20.md) | [Lab 20](../../labs/lab-20.md) | Published |
 
-**Module test:** released with Day 20 in [Assessments](../../assessments/index.md).
+**Module test:** [Module 4 test](../../assessments/module-4-test.md) (Days 16–20) is now available in [Assessments](../../assessments/index.md).

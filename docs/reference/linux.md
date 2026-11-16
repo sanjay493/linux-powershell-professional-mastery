@@ -1814,3 +1814,112 @@ The entries below cover the host-firewall toolkit from Day 18. Every change need
 | **Common errors** | Testing from the server itself (loopback) · scanning hosts you are not authorised to test · forgetting to cancel the timer |
 | **Use case** | Any remote firewall change; the evidence matrix for a change ticket. |
 | **Docs** | <https://man7.org/linux/man-pages/man1/systemd-run.1.html> · <https://nmap.org/book/man-port-scanning-basics.html> |
+
+## Security Auditing & Investigation
+
+The entries below cover the baseline-audit and network-investigation toolkit from Days 19–20. All are **read-only reconnaissance**; only run them on systems you own or are authorised to assess.
+
+### find -perm (SUID / SGID / world-writable audit)
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux (findutils); for unreadable directories, root |
+| **Description** | Audits the filesystem for privilege-bearing and exposed files: SUID/SGID binaries, world-writable files and directories, and orphaned files. `-xdev` keeps the scan on one filesystem. |
+| **Syntax** | <code>find PATH -xdev -type f -perm -4000</code> (SUID; `-2000` SGID) · <code>find PATH -xdev -type d -perm -0002 ! -perm -1000</code> (world-writable, no sticky) · <code>find PATH -xdev \( -nouser -o -nogroup \)</code> (orphaned) |
+| **Parameters** | `-perm -MODE` all bits set (octal `4000`/`2000`/`0002`/`1000`) · `-printf '%M %u %g %p\n'` custom output · `-xdev` one filesystem · `2>/dev/null` hide permission-denied |
+| **Example** | <code>find / -xdev -type f -perm -4000 -printf '%M %u %p\n' 2>/dev/null &#124; sort</code> |
+| **Expected output** | `-rwsr-xr-x root /usr/bin/sudo` · `-rwsr-xr-x root /srv/app/helper` (captured; the second, outside `/usr`, is a finding) |
+| **Equivalent** | No SUID model on Windows; audit services, scheduled tasks and ACLs (`icacls`, `Get-Acl`) instead |
+| **Common errors** | Forgetting `-xdev` on a host with NFS (slow) · running without `sudo` (missing unreadable dirs) · confusing `-perm -4000` (all bits) with `-perm 4000` (exactly) |
+| **Use case** | Baseline the SUID list once, then `comm -13 baseline now` to spot new privileged binaries (persistence/escalation). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/find.1.html> |
+
+### getcap / setcap (file capabilities)
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux (libcap2-bin); `getcap` read-only, `setcap` needs root |
+| **Description** | Lists (and sets) POSIX file capabilities — subsets of root power granted to a binary without full SUID (e.g. `cap_net_raw`, `cap_net_admin`, `cap_setuid`). |
+| **Syntax** | `getcap -r PATH` · `setcap CAP+ep FILE` · `setcap -r FILE` (remove) |
+| **Parameters** | `-r` recurse · `+ep` effective+permitted · capabilities named in `capabilities(7)` |
+| **Example** | `getcap -r / 2>/dev/null` |
+| **Expected output** | `/srv/lab/bin/net-probe cap_net_raw=ep` (captured; an entry outside `/usr` is a finding) |
+| **Equivalent** | Windows privileges/token rights (`whoami /priv`); no direct file equivalent |
+| **Common errors** | `getcap: command not found` (install libcap2-bin) · assuming only SUID grants privilege — capabilities do too |
+| **Use case** | Audit for unexpected capabilities (an escalation path); prefer a narrow capability over SUID-root when granting a privilege. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/getcap.8.html> · <https://man7.org/linux/man-pages/man7/capabilities.7.html> |
+
+### sudo -l / visudo -c (privilege review)
+
+| Field | Detail |
+|---|---|
+| **OS** | Any Linux with sudo; `-U` and `visudo -c` need root |
+| **Description** | Lists what a user may run via sudo and validates the sudoers policy. In an audit you hunt `NOPASSWD` rules and commands that can spawn a shell (`find`, `vi`, `less`, `awk`, `tar`, `env`, interpreters) — these are effectively full root (GTFOBins). |
+| **Syntax** | `sudo -l [-U USER]` · `visudo -c` (whole policy) · `visudo -cf FILE` |
+| **Parameters** | `-l` list rights · `-U USER` for another user (root) · `-c` check-only (read-only) |
+| **Example** | `sudo -l -U deploy ; sudo grep -rhE '^[^#].*NOPASSWD' /etc/sudoers /etc/sudoers.d/` |
+| **Expected output** | `User deploy may run the following commands on host:` · `(root) NOPASSWD: /usr/bin/find` (captured; a shell-escape finding) |
+| **Equivalent** | `Get-LocalGroupMember Administrators`; execution policy is **not** an equivalent control |
+| **Common errors** | Hand-editing `/etc/sudoers` (lockout) instead of `visudo` · treating a `NOPASSWD` shell-capable command as safe |
+| **Use case** | Least-privilege review; catching an over-broad or passwordless sudo grant. |
+| **Docs** | <https://man7.org/linux/man-pages/man5/sudoers.5.html> · <https://man7.org/linux/man-pages/man8/sudo.8.html> |
+
+### chage / passwd -S (account ageing audit)
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux (shadow-utils); other users need root |
+| **Description** | Reports password ageing and lock status. Finds stale credentials (changed long ago, never expiring) and locked/empty-password accounts. |
+| **Syntax** | `chage -l USER` · `passwd -S [-a] [USER...]` |
+| **Parameters** | `passwd -S` fields: name, status (`L` locked / `P` usable / `NP` none), last change, min, max, warn, inactive · `-a` all accounts |
+| **Example** | <code>sudo chage -l svc-old ; passwd -S -a &#124; awk '$2=="NP"'</code> |
+| **Expected output** | `Last password change : Jan 15, 2019` · `Maximum number of days between password change : 99999` (captured; stale + never-expiring = finding) |
+| **Equivalent** | <code>Get-LocalUser &#124; Select Name,Enabled,PasswordExpires,LastLogon</code> |
+| **Common errors** | Reading `/etc/shadow` without `sudo` (empty output) · confusing kernel account UIDs with human users |
+| **Use case** | Offboarding checks; enforcing a password-ageing policy (`/etc/login.defs`). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/chage.1.html> · <https://man7.org/linux/man-pages/man1/passwd.1.html> |
+
+### sysctl (kernel hardening audit)
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux (procps); reading is unprivileged, writing needs root |
+| **Description** | Reads kernel tunables under `/proc/sys`. Audits the security-relevant ones; persist changes in `/etc/sysctl.d/*.conf` and apply with `sysctl --system`. |
+| **Syntax** | `sysctl KEY` · `sysctl -a` · `sysctl -w KEY=VALUE` (change; prefer a file) |
+| **Parameters** | Secure values: `fs.protected_symlinks=1`, `fs.protected_regular=1`, `fs.suid_dumpable=0`, `kernel.kptr_restrict=1`, `kernel.dmesg_restrict=1`, `net.ipv4.conf.all.rp_filter=1`, `net.ipv4.tcp_syncookies=1`, `net.ipv4.conf.all.accept_redirects=0` |
+| **Example** | `sysctl kernel.dmesg_restrict fs.suid_dumpable net.ipv4.conf.all.rp_filter` |
+| **Expected output** | `kernel.dmesg_restrict = 1` · `fs.suid_dumpable = 0` · `net.ipv4.conf.all.rp_filter = 1` (captured) |
+| **Equivalent** | Windows registry / Security Baselines (Security Compliance Toolkit) |
+| **Common errors** | `sysctl -w` only (reverts on reboot) · a key missing (`yama.ptrace_scope`) because the LSM is not built in |
+| **Use case** | Confirm a host matches the hardening standard (CIS Benchmark). |
+| **Docs** | <https://man7.org/linux/man-pages/man8/sysctl.8.html> |
+
+### nmap (host discovery and port scanning)
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux/Windows (package nmap, 7.94 on Ubuntu 24.04); `-sS`/`-O` need root. **Authorised targets only** — Nmap sanctions `scanme.nmap.org` for practice |
+| **Description** | Discovers live hosts and open ports, identifies services/versions and OS. Reads *open* (SYN-ACK), *closed* (RST = refused) and *filtered* (no reply = dropped). |
+| **Syntax** | <code>nmap [-sn &#124; -sT &#124; -sS] [-sV] [-O] [--reason] [--open] [-p PORTS &#124; --top-ports N] [-Pn] [-oA BASE] TARGET</code> |
+| **Parameters** | `-sn` discovery only · `-sT` connect / `-sS` SYN (root) · `-sV` version · `-O` OS (root) · `--reason` why each state · `--open` only open · `-oA` save all formats · `-T4` timing |
+| **Example** | `nmap -sT --reason --open --top-ports 50 scanme.nmap.org` |
+| **Expected output** | `22/tcp open ssh syn-ack` · `443/tcp closed https reset` · `8080/tcp filtered http no-response` (example, reviewed against nmap.org/book) |
+| **Equivalent** | `Test-NetConnection HOST -Port N` (one port at a time; Windows has no built-in scanner) |
+| **Common errors** | Scanning unauthorised hosts (illegal) · `-sS`/`-O` without root (silent fallback) · reading *filtered* as "safe" |
+| **Use case** | Verifying a firewall policy from outside (Day 18); mapping an authorised target's exposure. |
+| **Docs** | <https://nmap.org/book/man.html> · <https://nmap.org/book/man-port-scanning-basics.html> · <https://nmap.org/book/man-legal.html> |
+
+### ss / lsof -i (live socket investigation)
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux (iproute2 `ss`, lsof); other users' processes need root |
+| **Description** | Lists listening and established sockets with the owning process — the core of mapping a suspicious connection to its program, binary and user. Covered for troubleshooting on Day 14; used for hunting here. |
+| **Syntax** | `ss -tulpn` (listeners) · `ss -tanp state established` · `ss -tanp 'dst ADDR'` · `lsof -nP -i [:PORT]` |
+| **Parameters** | `-t`/`-u` TCP/UDP · `-l` listening · `-n` numeric · `-p` process · `state`/`dst` filters · then `ls -l /proc/PID/exe` for the binary (`(deleted)` = IoC) |
+| **Example** | `sudo ss -tanp state established ; sudo lsof -nP -i :4444` |
+| **Expected output** | `ESTAB 10.0.0.10:48912 203.0.113.10:443 users:(("python3",pid=1402,fd=5))` (example, reviewed against ss(8)/Day 14 captures) |
+| **Equivalent** | `Get-NetTCPConnection` + `Get-Process -Id OwningProcess`; `netstat -anob` |
+| **Common errors** | Missing the process column (not root) · trusting the process *name* over its path · forgetting `-n` (reverse-DNS tips off an attacker) |
+| **Use case** | Finding a backdoor listener or an outbound beacon and the process behind it. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ss.8.html> · <https://man7.org/linux/man-pages/man8/lsof.8.html> |

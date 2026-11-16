@@ -1780,3 +1780,82 @@ All entries below are **Windows-only** (NetSecurity and NetConnection modules: W
 | **Common errors** | Empty log because `LogBlocked` is off for the active profile · enabling `/success` (5156 floods the Security log) · forgetting local time |
 | **Use case** | Proving that the firewall dropped a client's connection; spotting scans. |
 | **Docs** | <https://learn.microsoft.com/en-us/windows/security/operating-system-security/network-security/windows-firewall/configure-logging> · <https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/audit-filtering-platform-connection> |
+
+## Security Auditing & Investigation
+
+The entries below cover the Windows baseline-audit and network-investigation cmdlets from Days 19–20. Most are read-only; run active checks only on authorised systems.
+
+### Get-ExecutionPolicy / Set-ExecutionPolicy
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7 on Windows; on Linux/macOS the policy is fixed at `Unrestricted` (behaves like `Bypass`). `Set` for `LocalMachine` needs elevation |
+| **Description** | Reads/sets the script-execution policy per scope. **Not a security boundary** (Microsoft) — it prevents *accidental* execution; a user can paste code or use `-ExecutionPolicy Bypass`. |
+| **Syntax** | `Get-ExecutionPolicy [-List] [-Scope <Scope>]` · `Set-ExecutionPolicy -ExecutionPolicy <Policy> -Scope <Scope>` |
+| **Parameters** | Scopes `MachinePolicy`,`UserPolicy`,`Process`,`CurrentUser`,`LocalMachine` (precedence left-to-right) · policies `Restricted`,`AllSigned`,`RemoteSigned`,`Unrestricted`,`Bypass`,`Undefined` · client default `Restricted`, server default `RemoteSigned` |
+| **Example** | `Get-ExecutionPolicy -List` |
+| **Expected output** | `LocalMachine       RemoteSigned` (example, reviewed against about_Execution_Policies) |
+| **Equivalent** | No direct Linux equivalent; script trust on Linux is file permissions + signing |
+| **Common errors** | Treating it as security · a `MachinePolicy`/`UserPolicy` GPO overriding your `Set` · `Process` scope not persisting (by design) |
+| **Use case** | Baseline check; prefer `RemoteSigned`/`AllSigned` but pair with signing, logging and app control. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies> |
+
+### Get-MpComputerStatus / Get-MpPreference / Get-MpThreatDetection
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only** (Defender module), 5.1 and 7 on Windows |
+| **Description** | Reports Microsoft Defender engine, signature and protection state; its configuration (including exclusions); and recorded threat detections. |
+| **Syntax** | `Get-MpComputerStatus` · `Get-MpPreference` · `Get-MpThreatDetection` |
+| **Parameters** | Key fields: `RealTimeProtectionEnabled`, `AntivirusEnabled`, `AntivirusSignatureAge`, `BehaviorMonitorEnabled`, `AMRunningMode`; `Get-MpPreference` → `ExclusionPath`/`ExclusionProcess` |
+| **Example** | <code>Get-MpComputerStatus &#124; Select RealTimeProtectionEnabled, AntivirusSignatureAge</code> |
+| **Expected output** | `RealTimeProtectionEnabled : True` · `AntivirusSignatureAge : 0` (example, reviewed against the Defender module docs) |
+| **Equivalent** | `systemctl status clamav-*` (if ClamAV is used); Linux has no built-in AV |
+| **Common errors** | Not found in PowerShell 7 on Linux · real-time protection off, or an attacker-added `ExclusionPath`, being overlooked |
+| **Use case** | Confirm AV is on and current; detect tampering (disabled protection, suspicious exclusions, detections). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/defender/get-mpcomputerstatus> · <https://learn.microsoft.com/en-us/powershell/module/defender/get-mppreference> |
+
+### Get-FileHash / Get-AuthenticodeSignature / Unblock-File
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | `Get-FileHash`/`Unblock-File` 5.1 and 7 (all OS); `Get-AuthenticodeSignature` **Windows only** |
+| **Description** | Integrity and trust checks for a file: a cryptographic hash for reputation/comparison, the digital-signature status, and removal of the Mark-of-the-Web (Zone.Identifier) on downloaded files. |
+| **Syntax** | `Get-FileHash -Path F [-Algorithm SHA256]` · `Get-AuthenticodeSignature -FilePath F` · `Unblock-File -Path F [-WhatIf]` |
+| **Parameters** | `-Algorithm` `SHA256`(default)/`SHA1`/`SHA512`/`MD5` · signature `Status` `Valid`/`NotSigned`/`HashMismatch`/`UnknownError` |
+| **Example** | `Get-FileHash .\update.exe -Algorithm SHA256 ; Get-AuthenticodeSignature .\update.exe` |
+| **Expected output** | `SHA256  9F86D0...  update.exe` · `Status : NotSigned` (example, reviewed against the cmdlet docs) |
+| **Equivalent** | `sha256sum FILE` · `dpkg -V` / GPG signature checks · (no MotW on Linux) |
+| **Common errors** | Comparing against the wrong algorithm · assuming "signed" means safe (check the signer) · locked/missing file |
+| **Use case** | Submit a hash to threat intel; decide whether a binary is a trusted, validly signed publisher's or a renamed/tampered file. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-filehash> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/get-authenticodesignature> |
+
+### Get-BitLockerVolume / Confirm-SecureBootUEFI / Get-SmbServerConfiguration
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only**; `Confirm-SecureBootUEFI` needs elevation + UEFI; `Get-SmbServerConfiguration` elevation |
+| **Description** | Audits the boot chain and data-at-rest: drive-encryption status, whether Secure Boot is enabled, and whether the obsolete SMB1 protocol is on. |
+| **Syntax** | `Get-BitLockerVolume [-MountPoint C:]` · `Confirm-SecureBootUEFI` · `Get-SmbServerConfiguration` |
+| **Parameters** | BitLocker `VolumeStatus`/`ProtectionStatus`/`EncryptionPercentage` · `Confirm-SecureBootUEFI` → `True`/`False` · SMB `EnableSMB1Protocol` (want `False`) |
+| **Example** | <code>Get-BitLockerVolume &#124; Select MountPoint, ProtectionStatus ; Confirm-SecureBootUEFI</code> |
+| **Expected output** | `C:  On` · `True` · `EnableSMB1Protocol : False` (example, reviewed against the module docs) |
+| **Equivalent** | LUKS (`cryptsetup status`) · `mokutil --sb-state` · (SMB1 is Windows-specific) |
+| **Common errors** | `Confirm-SecureBootUEFI` throwing on legacy BIOS or unelevated · leaving SMB1 enabled (WannaCry vector) |
+| **Use case** | Hardening baseline; `Set-SmbServerConfiguration -EnableSMB1Protocol $false` to remediate. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/bitlocker/get-bitlockervolume> · <https://learn.microsoft.com/en-us/powershell/module/secureboot/confirm-securebootuefi> · <https://learn.microsoft.com/en-us/powershell/module/smbshare/get-smbserverconfiguration> |
+
+### Get-NetTCPConnection (connection hunting)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only** (NetTCPIP), 5.1 and 7 on Windows |
+| **Description** | Lists TCP connections and listeners with state and the `OwningProcess` PID — used here to hunt backdoor listeners and outbound beacons by mapping each socket to its process and binary. (Introduced for troubleshooting on Day 14.) |
+| **Syntax** | `Get-NetTCPConnection [-State <State[]>] [-LocalPort <n>] [-RemoteAddress <ip>] [-OwningProcess <pid>]` |
+| **Parameters** | `-State` `Listen`,`Established`,`TimeWait`,`CloseWait`,… · then `Get-Process -Id OwningProcess` for the `Path`; `netstat -anob` shows the executable directly |
+| **Example** | <code>Get-NetTCPConnection -State Established &#124; Select RemoteAddress,RemotePort,OwningProcess</code> |
+| **Expected output** | `203.0.113.10  443  6273` → `Get-Process -Id 6273` reveals `C:\Users\Public\svchost.exe` (example; fake-path binary = IoC) |
+| **Equivalent** | `ss -tanp state established` · `lsof -nP -i` |
+| **Common errors** | Trusting the process name not its path · forgetting that a beacon is identified by *regular* repeat connections to one address |
+| **Use case** | Incident response: find the process behind a suspicious connection before containing it. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection> |

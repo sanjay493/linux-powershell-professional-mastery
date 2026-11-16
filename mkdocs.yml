@@ -158,6 +158,8 @@ nav:
           - "Day 16: System Logs": course/module-4/day-16.md
           - "Day 17: Authentication & Security Monitoring": course/module-4/day-17.md
           - "Day 18: Firewall Management": course/module-4/day-18.md
+          - "Day 19: System Security Auditing": course/module-4/day-19.md
+          - "Day 20: Network Security Investigation": course/module-4/day-20.md
           # <<< DAYS module-4
       - "Module 5: Scripting & Automation":
           - course/module-5/index.md
@@ -193,6 +195,8 @@ nav:
       - "Lab 16: What Happened at 03:12?": labs/lab-16.md
       - "Lab 17: Who Got In?": labs/lab-17.md
       - "Lab 18: Least-Privilege Firewall": labs/lab-18.md
+      - "Lab 19: Baseline and Hardening Audit": labs/lab-19.md
+      - "Lab 20: Suspicious Host Investigation": labs/lab-20.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md
@@ -207,6 +211,7 @@ nav:
       - "Module 1 Test": assessments/module-1-test.md
       - "Module 2 Test": assessments/module-2-test.md
       - "Module 3 Test": assessments/module-3-test.md
+      - "Module 4 Test": assessments/module-4-test.md
   - Downloads:
       - downloads/index.md
   - About:
