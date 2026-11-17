@@ -30,6 +30,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 18 | [Firewall Management](../course/module-4/day-18.md#quiz) |
 | 19 | [System Security Auditing](../course/module-4/day-19.md#quiz) |
 | 20 | [Network Security Investigation](../course/module-4/day-20.md#quiz) |
+| 21 | [Variables and User Input](../course/module-5/day-21.md#quiz) |
+| 22 | [Conditions and Loops](../course/module-5/day-22.md#quiz) |
 
 ## Module tests
 

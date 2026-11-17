@@ -1923,3 +1923,172 @@ The entries below cover the baseline-audit and network-investigation toolkit fro
 | **Common errors** | Missing the process column (not root) · trusting the process *name* over its path · forgetting `-n` (reverse-DNS tips off an attacker) |
 | **Use case** | Finding a backdoor listener or an outbound beacon and the process behind it. |
 | **Docs** | <https://man7.org/linux/man-pages/man8/ss.8.html> · <https://man7.org/linux/man-pages/man8/lsof.8.html> |
+
+## Scripting
+
+The entries below cover Bash scripting fundamentals from Days 21–22: variables and input, then conditions and loops. They are shell built-ins and keywords (Bash 5.2 on Ubuntu 24.04) unless noted; none needs root.
+
+### Variables and parameter expansion
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash (POSIX forms work in `sh`; `${v^^}`, `${v,,}`, arrays need Bash 4+) |
+| **Description** | Assigns and expands shell variables. Parameter expansion supplies defaults, enforces required values and trims or replaces text without starting a process. |
+| **Syntax** | `name=value` (no spaces) · `"$name"` · `${name:-def}` · `${name:=def}` · `${name:?msg}` · `${#name}` · `${name##*/}` · `${name%.*}` · `${name//old/new}` |
+| **Parameters** | `:-` default · `:=` assign default · `:?` abort if unset/empty · `:+` alternate · `#`/`##` strip prefix · `%`/`%%` strip suffix · `^^`/`,,` upper/lower · `:off:len` substring |
+| **Example** | `path=/var/log/nginx/access.log.2.gz; echo "${path##*/}" "${path%/*}"; : "${API_URL:?API_URL must be set}"` |
+| **Expected output** | `access.log.2.gz /var/log/nginx` · `bash: API_URL: API_URL must be set` (captured) |
+| **Equivalent** | `$name = 'v'`; `Split-Path -Leaf/-Parent`; `$v ?? 'def'` (7.0+); `[Parameter(Mandatory)]` |
+| **Common errors** | `name = value` (*command not found*) · unquoted `$var` (word splitting, globbing) · `$name_suffix` instead of `${name}_suffix` |
+| **Use case** | Configurable scripts: `retention=${RETENTION_DAYS:-14}`; safe deletes: `rm -rf -- "${dir:?}/"*`. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html> · <https://man7.org/linux/man-pages/man1/bash.1.html> |
+
+### Command substitution and arithmetic ($( ), $(( )))
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash (POSIX) |
+| **Description** | `$(cmd)` inserts a command's output (trailing newlines removed); `$(( ))` evaluates 64-bit signed **integer** arithmetic. |
+| **Syntax** | `var=$(command)` · `$(( expr ))` · `(( expr ))` (status only) · `let expr` |
+| **Parameters** | Operators `+ - * / % **`, comparisons, <code>&amp;&amp; &#124;&#124;</code> inside `(( ))`; `10#N` forces base 10 |
+| **Example** | `today=$(date -u +%F); echo $(( 850 * 100 / 1000 )) $(( 10#08 + 1 ))` |
+| **Expected output** | `85 9` (captured) |
+| **Equivalent** | `$today = (Get-Date).ToString('yyyy-MM-dd')`; `850 * 100 / 1000` (PowerShell does decimals) |
+| **Common errors** | `$(( 08 + 1 ))` → *value too great for base* · expecting decimals (`7/2` is `3`; use `awk`) · `((n++))` returning 1 under `set -e` when `n` is 0 |
+| **Use case** | Percentages and thresholds in monitoring scripts. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Shell-Arithmetic.html> · <https://www.gnu.org/software/bash/manual/html_node/Command-Substitution.html> |
+
+### export / env / printenv
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash built-in `export`; `env`, `printenv` from coreutils |
+| **Description** | Marks variables for the environment of child processes; lists the environment or runs one command with a modified environment. |
+| **Syntax** | `export NAME[=VALUE]` · `export -n NAME` · `env [-i] [-u NAME] [NAME=VALUE]... [CMD]` · `printenv [NAME]` · `NAME=VALUE cmd` |
+| **Parameters** | `-n` un-export · `env -i` empty environment · `-u` unset one variable |
+| **Example** | `LOG_LEVEL=debug; bash -c 'echo "[$LOG_LEVEL]"'; export LOG_LEVEL; bash -c 'echo "[$LOG_LEVEL]"'; TZ=UTC date +%Z` |
+| **Expected output** | `[]` · `[debug]` · `UTC` (captured) |
+| **Equivalent** | `$env:LOG_LEVEL = 'debug'`; `[Environment]::SetEnvironmentVariable(n, v, 'User')` (Windows) |
+| **Common errors** | Variable set in `~/.bashrc` but missing under cron/systemd · expecting a child script to change the parent's variables (use `source`) · secrets exported to every child process |
+| **Use case** | Passing configuration to programs; `LC_ALL=C sort` for byte-order sorting. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/env.1.html> · <https://man7.org/linux/man-pages/man7/environ.7.html> |
+
+### declare / readonly / arrays
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash built-ins (associative arrays Bash 4+; negative indexes 4.3+) |
+| **Description** | Sets variable attributes (integer, read-only, case conversion, export) and creates indexed and associative arrays. `declare -p` shows a variable exactly. |
+| **Syntax** | <code>declare [-i] [-r] [-l&#124;-u] [-x] [-a&#124;-A] NAME[=VALUE]</code> · `readonly NAME=VALUE` · `arr=(a "b c")` · `"${arr[@]}"` · `${#arr[@]}` · `declare -A m=([k]=v)` · `"${!m[@]}"` |
+| **Parameters** | `-i` integer · `-r` read-only · `-l`/`-u` lower/upper · `-x` export · `-a`/`-A` indexed/associative · `-p` print |
+| **Example** | `servers=(web-01 "db 01"); servers+=(cache-01); echo "${#servers[@]} ${servers[-1]}"; declare -p servers` |
+| **Expected output** | `3 cache-01` · `declare -a servers=([0]="web-01" [1]="db 01" [2]="cache-01")` (format captured) |
+| **Equivalent** | `[int]$n`, `New-Variable -Option ReadOnly`, `@('a','b')`, `@{ k = 'v' }` |
+| **Common errors** | `declare -i n=abc` silently gives 0 (not validation) · `${arr}` (first element only) · unquoted `${arr[@]}` |
+| **Use case** | Host lists, per-key counters (Day 22), constants such as `MAX_RETRIES`. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html> · <https://www.gnu.org/software/bash/manual/html_node/Arrays.html> |
+
+### Positional parameters ($1, $#, "$@", shift)
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash (POSIX) |
+| **Description** | Script and function arguments. `"$@"` expands every argument as a separate, correctly quoted word. |
+| **Syntax** | `$0` · `$1`…`${10}` · `$#` · `"$@"` · `"$*"` · `shift [N]` · `set -- ARGS` |
+| **Parameters** | `$#` count · `"$@"` all (separate words) · `"$*"` all (one word, joined by first `IFS` char) · `shift` drops `$1` |
+| **Example** | `./check-args.sh web-01 "change window" 443` with `for a in "$@"; do echo "[$a]"; done` |
+| **Expected output** | `[web-01]` · `[change window]` · `[443]` (captured) |
+| **Equivalent** | `param()` block, `$args`, `$PSBoundParameters` |
+| **Common errors** | Unquoted `$@` or `$*` (arguments with spaces split) · `$10` (means `${1}0`) · forgetting a usage check: `"${1:?usage: $0 HOST}"` |
+| **Use case** | Non-interactive scripts for cron and CI. Option parsing with `getopts` arrives on Day 23. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Positional-Parameters.html> · <https://www.gnu.org/software/bash/manual/html_node/Special-Parameters.html> |
+
+### read
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash built-in |
+| **Description** | Reads one line from standard input and splits it into variables using `IFS`. Returns non-zero at end of input or on timeout (status > 128). |
+| **Syntax** | `read [-r] [-s] [-p PROMPT] [-t SECS] [-n N] [-a ARRAY] [-d DELIM] [NAME...]` |
+| **Parameters** | `-r` raw (keep `\`) · `-s` silent · `-p` prompt (terminal only) · `-t` timeout · `-n` N chars · `-a` array · `-d ''` NUL-delimited · `IFS=` keep spaces |
+| **Example** | `IFS=: read -r user _ uid _ _ home shell < <(getent passwd root); echo "$user $uid $shell"` |
+| **Expected output** | `root 0 /bin/bash` (captured) |
+| **Equivalent** | `Read-Host -Prompt` · `Read-Host -AsSecureString` · `-split` / `.Split(':')` |
+| **Common errors** | Missing `-r` (backslashes vanish) · <code>cmd &#124; read v</code> (subshell: `v` lost) · prompting when stdin is not a terminal (cron) |
+| **Use case** | Interactive helper scripts; parsing colon-separated records; `read -s` for PINs and passwords. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html#index-read> |
+
+### printf
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash built-in (also `/usr/bin/printf`, coreutils) |
+| **Description** | Formatted, portable output; `-v` stores the result in a variable; `%(fmt)T` formats times (Bash 4.2+). |
+| **Syntax** | `printf [-v VAR] FORMAT [ARG...]` |
+| **Parameters** | `%s` `%d` `%f` `%x` `%%` · width/precision `%-10s` `%6.2f` · `%q` shell-quoted · format reused for extra arguments |
+| **Example** | <code>printf '%-10s&#124;%5d&#124;%6.2f%%\n' disk 42 85.123</code> |
+| **Expected output** | <code>disk      &#124;   42&#124; 85.12%</code> (captured; spaces pad the columns) |
+| **Equivalent** | <code>'{0,-10}&#124;{1,5}&#124;{2,6:N2}%' -f 'disk', 42, 85.123</code> |
+| **Common errors** | Forgetting `\n` · passing user data as the FORMAT (`printf "$msg"`) — use `printf '%s\n' "$msg"` |
+| **Use case** | Aligned report columns (Labs 21–22). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/printf.1.html> |
+
+### if / test / [ ] / [[ ]] / (( ))
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash keywords/built-ins (`[[ ]]` and `(( ))` are Bash, not POSIX `sh`) |
+| **Description** | `if` runs a block when a command's exit status is 0. `[ ]`/`test` and `[[ ]]` test strings, numbers and files; `(( ))` tests arithmetic. |
+| **Syntax** | `if CMD; then …; elif CMD; then …; else …; fi` · `[[ -f $f && -s $f ]]` · `[[ $s == *.log ]]` · `[[ $s =~ ^re$ ]]` · `(( n >= 90 ))` |
+| **Parameters** | Strings `-z -n = != < >` · integers `-eq -ne -lt -le -gt -ge` · files `-e -f -d -L -r -w -x -s -nt -ot` · `BASH_REMATCH` holds regex groups |
+| **Example** | `[[ access-2026-11-17.log =~ ^access-([0-9]{4})- ]] && echo "${BASH_REMATCH[1]}"; [[ 10 < 9 ]]; echo $?` |
+| **Expected output** | `2026` · `0` (string comparison: true) (captured) |
+| **Equivalent** | `if ($a -ge 90) {} elseif () {} else {}`; `-like`, `-match`/`$Matches`, `Test-Path` |
+| **Common errors** | `[ $a > 5 ]` (redirection, creates file `5`) · unquoted empty var in `[ ]` (*unary operator expected*) · quoted regex in `=~` (literal match) · missing spaces inside brackets |
+| **Use case** | Thresholds, pre-flight checks (`[[ -w $dir ]]`), input validation. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Conditional-Constructs.html> · <https://www.gnu.org/software/bash/manual/html_node/Bash-Conditional-Expressions.html> · <https://man7.org/linux/man-pages/man1/test.1.html> |
+
+### case
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash keyword (`;&` and `;;&` Bash 4+) |
+| **Description** | Multi-way branch on **glob** patterns; first match wins. |
+| **Syntax** | <code>case WORD in PAT1&#124;PAT2) …;; PAT3) …;; *) …;; esac</code> |
+| **Parameters** | <code>&#124;</code> alternatives · `*)` default · `;;` end branch · `;&` fall through · `;;&` keep testing · `shopt -s nocasematch` ignore case |
+| **Example** | `case app.log.2.gz in *.gz) echo compressed;; *.log) echo plain;; *) echo other;; esac` |
+| **Expected output** | `compressed` (captured pattern) |
+| **Equivalent** | `switch -Wildcard ($x) { '*.gz' { …; break } default { } }` |
+| **Common errors** | Quoting patterns (`"*.gz"` matches literally) · general pattern placed before a specific one · missing `;;` |
+| **Use case** | Option handling, file-type dispatch, yes/no answers, log severities. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Conditional-Constructs.html> |
+
+### for / while / until / break / continue
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash keywords/built-ins (`{01..10}` padding Bash 4+) |
+| **Description** | Loops over lists, globs, ranges, lines of input, or while/until a command succeeds. `break N` / `continue N` control nested loops. |
+| **Syntax** | `for x in "${list[@]}"; do …; done` · `for (( i=0; i<n; i++ ))` · <code>while IFS= read -r l &#124;&#124; [[ -n $l ]]; do …; done &lt; file</code> · `until CMD; do …; done` |
+| **Parameters** | `shopt -s nullglob` (no literal `*`) · `< <(cmd)` process substitution keeps variables · `mapfile -t arr < file` |
+| **Example** | <code>n=0; while IFS= read -r l &#124;&#124; [[ -n $l ]]; do n=$((n+1)); done &lt; logs/app.log; echo "$n"</code> |
+| **Expected output** | `5` for a 5-line file without a final newline (`4` without the <code>&#124;&#124;</code> clause) (captured) |
+| **Equivalent** | `foreach`, `for`, `while`, `do {} until ()`, `ForEach-Object`, `switch -File` |
+| **Common errors** | `for f in $(ls)` · `{1..$n}` (no variables in brace ranges) · <code>cmd &#124; while read</code> (subshell) · unbounded wait loops |
+| **Use case** | Fleet checks, log triage, retry with backoff (Lab 22). |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Looping-Constructs.html> · <https://www.gnu.org/software/bash/manual/html_node/The-Shopt-Builtin.html> |
+
+### timeout / seq
+
+| Field | Detail |
+|---|---|
+| **OS** | coreutils (all Ubuntu) |
+| **Description** | `timeout` kills a command that exceeds a time limit (exit 124); `seq` prints number sequences, including from variables. |
+| **Syntax** | `timeout [-k KILL_AFTER] [-s SIGNAL] DURATION CMD [ARG...]` · `seq [-w] [-s SEP] [FIRST [STEP]] LAST` |
+| **Parameters** | `DURATION` `5`, `2.5`, `1m` · `-k` send KILL after an extra delay · `seq -w` equal width |
+| **Example** | `timeout 2 bash -c 'while :; do sleep 0.5; done'; echo $?` |
+| **Expected output** | `124` (captured) |
+| **Equivalent** | `Wait-Job -Timeout`; `ForEach-Object -Parallel -TimeoutSeconds` (7.0+); `1..$n` |
+| **Common errors** | Forgetting that 124 means "timed out" not "failed" · wrapping a shell built-in directly (`timeout 2 read …` fails; wrap `bash -c`) |
+| **Use case** | Bounding network probes inside loops: `timeout 2 bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "$host" "$port"`. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/timeout.1.html> · <https://man7.org/linux/man-pages/man1/seq.1.html> |

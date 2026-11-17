@@ -1,13 +1,13 @@
 # Development Status
 
-**Last updated:** 2026-11-16 · **Last release:** 2026-11-16 22:00 IST nightly (Days 19–20, v0.10.0, Module 4 complete) · **Next release:** 2026-11-17 22:00 IST (Days 21–22)
+**Last updated:** 2026-11-17 · **Last release:** 2026-11-17 22:00 IST nightly (Days 21–22, v0.11.0, Module 5 begins) · **Next release:** 2026-11-18 22:00 IST (Days 23–24)
 
 ## Phase tracker
 
 | Phase | Status | Notes |
 |---|---|---|
 | 1. Inspection & planning | Done | Tools checked; `course-plan.yml` is the curriculum and schedule |
-| 2. Course content | In progress | Days 01–20 published, Modules 1–4 complete (all four module tests released); Module 5 next; two days per night at 22:00 IST |
+| 2. Course content | In progress | Days 01–22 published, Modules 1–4 complete (all four module tests released); Module 5 in progress; two days per night at 22:00 IST |
 | 3. Scripts | In progress | `system-info`, `process-monitor`, `disk-monitor`, `dns-check`, `port-monitor`, `network-diagnostic`, `log-analyser` and `failed-login-report` (Bash + PowerShell) done; others ship with their days |
 | 4. Website | Done | MkDocs Material, nav markers for appending, search, dark/light theme |
 | 5. Handbooks (PDF) | Done (pipeline) | Rebuilt every release; topic PDFs appear when their modules are complete |
@@ -39,7 +39,9 @@
 | 18 | Firewall Management | Published | Published | — |
 | 19 | System Security Auditing | Published | Published | — |
 | 20 | Network Security Investigation | Published | Published | Module 4 test, Cybersecurity reference PDF |
-| 21–30 | See `course-plan.yml` | Planned | Planned | Per plan |
+| 21 | Variables and User Input | Published | Published | — |
+| 22 | Conditions and Loops | Published | Published | — |
+| 23–30 | See `course-plan.yml` | Planned | Planned | Per plan |
 
 ## Validation record
 
@@ -91,6 +93,9 @@
 | Day 20 and Lab 20 Bash/network content | `lsof -nP -i` confirmed on the release host; the Lab 20 setup/clean-up scripts are `bash -n`-clean | `nmap` options (`-sn`/`-sT`/`-sS`/`-sV`/`-O`/`--reason`/`--open`/`-p`/`--top-ports`/`-oA`, states, `scanme.nmap.org` authorisation), `ss`/`lsof` usage and `tcpdump`/`tshark` filters reviewed against the upstream Nmap man page (nmap/nmap docs/nmap.1), the tcpdump man source and the Day 14/15 captures | **Not executed**: `nmap`, `tcpdump`, `ss` and `iproute2` could not be installed on the release host, and scanning is only ever done against `scanme.nmap.org` or an owned lab; all scan/capture output labelled as examples |
 | Day 20, Lab 20 PowerShell/Windows content | — | `Get-NetTCPConnection` (states incl. `OwningProcess`), `Test-NetConnection -Port`, `netstat -anob`, `pktmon start`/`stop`/`etl2pcap` reviewed against the MicrosoftDocs NetTCPIP source and the Day 14 content (learn.microsoft.com not reachable) | Not executed; labelled as examples |
 | Module 4 test | — | Questions checked against the Day 16–20 lessons; the Part C practical uses only commands captured or verified above | Q25 practical not executed as a whole |
+| Day 21 and Lab 21 Bash demo output | Generated on 2026-11-17 by running the commands with Bash 5.2.21 on Ubuntu 24.04.5 in a container (error-message prefixes confirmed in an interactive `bash -i`): assignment and quoting, parameter expansion, `${v:?}`, `$(( ))` incl. the `08` octal error and `10#`, `awk` decimals, export/child visibility, `TZ=UTC date`, subshell and <code>cmd &#124; read</code> traps, here-strings, `read -r`/`IFS=`/`-a`/`-t` (status 142), `declare -i/-r/-l`, arrays and associative arrays, `printf`, positional parameters with `check-args.sh`, `set -o nounset` (exit 127), word splitting/globbing of unquoted variables. Lab 21 `intake.sh` (as printed in the lab) executed: valid run, invalid ticket/host/time/duration, wrong PIN, no input, environment override, unwritable output (exit 2), PIN absent from output, run from another directory | `bash -n` | User name shown as `student` (unset in the container); labelled where adjusted |
+| Day 22 and Lab 22 Bash demo output | Generated on 2026-11-17 with Bash 5.2.21, coreutils `timeout`, curl and Python 3 `http.server` on Ubuntu 24.04.5 in a container: command conditions, `[ ]`/`[[ ]]`/`(( ))` incl. `[[ 10 < 9 ]]` and *unary operator expected* (status 2), glob and `=~`/`BASH_REMATCH`, `-nt`, `if`/`elif` thresholds, `case`, `for`/brace/C-style loops, unmatched glob with and without `nullglob`, `while read` last-line and pipe-subshell traps, associative-array counting, `break`/`continue`/`break 2`/`until`, `set -e` + `((c++))` exit, retry with backoff against a delayed local listener, `timeout` exit 124. Lab 22 `lab22-setup.sh`, `lab22-services.sh` and `triage.sh` (extracted from the lab page) executed: full data set (exit 3, backoff on the delayed listener, DOWN and INVALID entries), healthy path (exit 0), bad folder (exit 1), empty folder | `bash -n` (ShellCheck not available on the release host; runs in CI only for `scripts/linux`) | — |
+| Day 21–22, Lab 21–22 PowerShell content | — | `Read-Host` (`-AsSecureString`, `-MaskInput` 7.1+), `Get-Credential`, `New-/Set-/Get-/Remove-Variable` options, scopes and `$using:`, `$env:` case sensitivity, `Environment.SetEnvironmentVariable` targets (User/Machine Windows only), validation attributes, `Set-StrictMode`, `Write-Host` information stream, comparison operators, `switch` options, ternary/`??`/chain operators (7.0+), `ForEach-Object -Parallel` (7.0+, `-ThrottleLimit` default 5) and `break` inside `ForEach-Object` reviewed from knowledge of the official PowerShell documentation (about_Variables, about_Scopes, about_Environment_Variables, about_Comparison_Operators, about_Switch, about_Foreach, ForEach-Object) | **Not executed**: PowerShell could not be installed on the release host; all PowerShell output is labelled as examples |
 | PDFs | Built and validated in CI (WeasyPrint needs Pango, which this Windows host lacks). The Cybersecurity Command Reference (Days 16–20 + SOC pathway) becomes ready now that Module 4 is complete | — | Not built locally |
 
 ## Curriculum topics (reference for nightly releases)
@@ -115,7 +120,9 @@ The full topic list for each day is in `docs/course/index.md` (key commands) and
 - **Day 18** Firewall management (published 2026-11-15): conntrack, netfilter, `nft`, `iptables`, `ufw`, lockout prevention, testing with `nc`/`nmap`; Windows Defender Firewall profiles, `Get-/New-/Remove-NetFirewallRule`, `netsh advfirewall export/import`, pfirewall.log.
 - **Day 19** System security auditing (published 2026-11-16): account hygiene (`awk` on passwd/shadow, `chage -l`, `passwd -S`), privilege review (`sudo -l -U`, sudoers `NOPASSWD` + shell-escape/GTFOBins, `visudo -c`), SUID/SGID (`find -perm -4000`, baseline diff, `dpkg -S`/`-V`), `getcap`, world-writable/orphaned files, sensitive modes, `sysctl` hardening, `login.defs`; Windows `Get-ExecutionPolicy` (defence in depth), `Get-MpComputerStatus`/`Get-MpPreference`, `Get-LocalGroupMember`, `whoami /priv`, `Get-FileHash`, `Get-AuthenticodeSignature`, `Get-BitLockerVolume`, `Confirm-SecureBootUEFI`, `Get-SmbServerConfiguration`, event 4104; ships Lab 19 with reversible setup/audit/clean-up scripts.
 - **Day 20** Network security investigation (published 2026-11-16): authorised read-only-first workflow; `nmap` (`-sn`/`-sT`/`-sS`/`-sV`/`-O`/`--reason`/`--open`/`-oA`, open/closed/filtered, `scanme.nmap.org`), `ss`/`lsof -i` socket→process→binary mapping, IoCs (backdoor listener, reverse shell, C2 beaconing, DNS tunnelling), `tcpdump`/`tshark` targeted capture, correlation with Days 17–19; Windows `Get-NetTCPConnection`+`OwningProcess`, `Test-NetConnection`, `netstat -anob`, `pktmon`; ships Lab 20 (isolated three-namespace backdoor/beacon lab), the **Module 4 test** and the **Cybersecurity Command Reference** PDF. **Module 4 complete.**
-- **Days 21–30:** as listed in `docs/course/index.md` and the course specification sections for Modules 5–6.
+- **Day 21** Variables and user input (published 2026-11-17): assignment, quoting and word splitting, parameter expansion (defaults, required values, trimming, replacement, case), `$(...)`/`$(( ))`, `export`/`env`, subshell and pipeline scope, `source`, `declare`/`readonly`/arrays, positional parameters, `read`, `printf`, `set -o nounset`; PowerShell variables, types and casting, `*-Variable`, scopes and dot-sourcing, `$env:`, quoting/here-strings/`-f`, `Read-Host`, `Get-Credential`, output streams, `param()` validation, `Set-StrictMode`; secrets and injection.
+- **Day 22** Conditions and loops (published 2026-11-17): exit-status truth, `if`/`elif`, `[ ]`/`[[ ]]`/`(( ))`, string/number/file tests, globs and `=~`, `case`; `for`/`while`/`until`, `while IFS= read -r`, process substitution, `nullglob`, `break`/`continue`, bounded retry with backoff and `timeout`; PowerShell comparison operators, `switch`, ternary/`??` (7.0+), `for`/`foreach`/`ForEach-Object` (`-Parallel` 7.0+)/`while`/`do`, labelled `break`.
+- **Days 23–30:** as listed in `docs/course/index.md` and the course specification sections for Modules 5–6.
 
 ## Hosting decision
 

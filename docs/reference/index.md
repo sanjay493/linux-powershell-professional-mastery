@@ -66,5 +66,6 @@ A searchable reference for every command taught in the course. Use the **search 
 | Authentication | :material-check: | :material-check: | Day 17 |
 | Firewall | :material-check: | :material-check: | Day 18 |
 | Security auditing & investigation | :material-check: | :material-check: | Days 19–20 |
-| Scripting & automation | Days 21–25 | Days 21–25 | |
+| Scripting: variables, input, conditions & loops | :material-check: | :material-check: | Days 21–22 |
+| Scripting & automation (functions, data, scheduling) | Days 23–25 | Days 23–25 | |
 | Remote administration | Day 26 | Day 26 | |

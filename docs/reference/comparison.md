@@ -465,3 +465,52 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Reverse-lookup an IP | `dig -x IP` · `host IP` | `Resolve-DnsName IP` | Day 13 |
 | Firewall drop log | `journalctl -k -g UFW` | `pfirewall.log`, Security 5157 | Day 18 |
 | Correlate logins | `journalctl _COMM=sshd` | `Get-WinEvent` 4624/4625 | Day 17 |
+
+## Scripting: variables and input
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| Assign / read | `name=web-01` · `"$name"` | `$name = 'web-01'` · `$name` | ⚠ No spaces around `=` in Bash |
+| Typed variable | `declare -i n=5` | `[int]$n = 5` | ⚠ Bash does not validate; PS rejects bad values |
+| Constant | `readonly MAX=3` | `New-Variable MAX 3 -Option ReadOnly` | |
+| Default value | `${v:-default}` | `$v ?? 'default'` (7.0+) · `if (-not $v) { … }` | `??` tests only `$null` |
+| Required value | `: "${v:?message}"` | `[Parameter(Mandatory)]` · `throw` | |
+| Basename / dirname | `${p##*/}` · `${p%/*}` | `Split-Path -Leaf` · `Split-Path -Parent` | |
+| Replace / case | `${v//a/b}` · `${v^^}` · `${v,,}` | `.Replace('a','b')` · `.ToUpper()` · `.ToLower()` | |
+| Command output | `x=$(cmd)` | `$x = cmd` | PS keeps objects |
+| Arithmetic | `$(( a * 100 / b ))` (integers) | `$a * 100 / $b` (decimals) | ⚠ Leading zero = octal in Bash |
+| Formatted text | `printf '%-10s %5.1f\n' a 3.14` | `'{0,-10} {1,5:N1}' -f 'a', 3.14` | |
+| Environment variable | `export X=1` · `"$X"` | `$env:X = '1'` · `$env:X` | ⚠ Case-sensitive on Linux |
+| One-command environment | `TZ=UTC date` | (set `$env:`, run, restore) | |
+| Persistent environment | `~/.profile`, `/etc/environment` | `[Environment]::SetEnvironmentVariable(n, v, 'User')` | Windows only for User/Machine |
+| Arguments | `$1` · `$#` · `"$@"` · `shift` | `param()` · `$args` · `$PSBoundParameters` | |
+| Prompt | `read -r -p 'Host: ' h` | `$h = Read-Host 'Host'` | Terminal only / interactive only |
+| Secret prompt | `read -r -s -p 'PIN: ' p` | `Read-Host -AsSecureString` · `Get-Credential` | Never pass secrets as arguments |
+| Arrays / maps | `a=(x "y z")` · `declare -A m=([k]=v)` | `@('x','y z')` · `@{ k = 'v' }` | |
+| Load settings file | `source ./site.env` | `. .\settings.ps1` · `Import-PowerShellDataFile` | `.psd1` cannot run code |
+| Undefined-variable errors | `set -o nounset` | `Set-StrictMode -Version Latest` | |
+
+## Scripting: conditions and loops
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| If / else if / else | `if …; then …; elif …; then …; else …; fi` | `if () {} elseif () {} else {}` | Bash tests exit status |
+| Numeric compare | `(( a >= 90 ))` · `[[ $a -ge 90 ]]` | `$a -ge 90` | ⚠ `>` is redirection in both shells |
+| String equal | `[[ $a == "$b" ]]` | `$a -eq $b` | ⚠ PS is case-insensitive; `-ceq` |
+| Empty test | `[[ -z $s ]]` · `[[ -n $s ]]` | `-not $s` · `[string]::IsNullOrEmpty($s)` | |
+| Wildcard match | `[[ $f == *.log ]]` | `$f -like '*.log'` | |
+| Regex match + groups | `[[ $s =~ ^(re)$ ]]` · `${BASH_REMATCH[1]}` | `$s -match '^(re)$'` · `$Matches[1]` | Regex unquoted in Bash |
+| Membership | loop over the array | `$list -contains $x` · `$x -in $list` | ⚠ `@(…) -eq $x` filters |
+| File tests | `[[ -f $p ]]` `[[ -d $p ]]` `[[ -s $p ]]` `[[ -r $p ]]` | `Test-Path $p -PathType Leaf/Container` | |
+| Multi-way branch | <code>case $x in a&#124;b) …;; *) …;; esac</code> | `switch -Wildcard ($x) { 'a' { …; break } default { } }` | ⚠ `switch` runs all matches without `break` |
+| Ternary | <code>[[ c ]] &amp;&amp; x=a &#124;&#124; x=b</code> | `$c ? 'a' : 'b'` (7.0+) | Bash form is not a true if/else |
+| Loop over a list | `for h in "${hosts[@]}"; do …; done` | `foreach ($h in $hosts) { }` | |
+| Numeric loop | `for (( i=1; i<=n; i++ ))` · `seq 1 "$n"` | `for ($i=1; $i -le $n; $i++) {}` · `1..$n` | ⚠ `{1..$n}` does not work |
+| Loop over files | `shopt -s nullglob; for f in dir/*.log` | `foreach ($f in Get-ChildItem dir -Filter *.log)` | |
+| Lines of a file | <code>while IFS= read -r l &#124;&#124; [[ -n $l ]]; do …; done &lt; f</code> | `switch -File f {}` · `foreach ($l in Get-Content f)` | |
+| Lines of command output | `while read -r l; do …; done < <(cmd)` | <code>cmd &#124; ForEach-Object { }</code> | ⚠ <code>cmd &#124; while</code> loses variables |
+| Condition loops | `while cmd` · `until cmd` | `while ()` · `do {} while ()` · `do {} until ()` | `do` runs at least once |
+| Skip / stop | `continue` · `break` · `break 2` | `continue` · `break` · `break label` | ⚠ use `return` in `ForEach-Object` |
+| Parallel loop | `cmd &` … `wait` · `xargs -P` | `ForEach-Object -Parallel -ThrottleLimit N` (7.0+) | |
+| Time limit | `timeout 30 cmd` (exit 124) | `Wait-Job -Timeout 30` | |
+| Pause | `sleep 2` | `Start-Sleep -Seconds 2` | |

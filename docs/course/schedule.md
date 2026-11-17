@@ -18,7 +18,7 @@ New lessons, labs and their supporting materials are published **every night at 
 | 2026-11-14 22:00 | 15, 16 | Labs 15–16, `network-diagnostic` and `log-analyser` scripts, **Module 3 test**, Networking guide PDF, interfaces/capture and logs references | :material-check-circle: Published |
 | 2026-11-15 22:00 | 17, 18 | Labs 17–18, `failed-login-report` scripts, authentication and firewall references | :material-check-circle: Published |
 | 2026-11-16 22:00 | 19, 20 | Labs 19–20, **Module 4 test**, Cybersecurity reference PDF | :material-check-circle: Published |
-| 2026-11-17 22:00 | 21, 22 | Labs 21–22 | Scheduled |
+| 2026-11-17 22:00 | 21, 22 | Labs 21–22, scripting (variables/input and conditions/loops) references | :material-check-circle: Published |
 | 2026-11-18 22:00 | 23, 24 | Labs 23–24 | Scheduled |
 | 2026-11-19 22:00 | 25, 26 | Labs 25–26, `system-health` scripts, **Module 5 test** | Scheduled |
 | 2026-11-20 22:00 | 27, 28 | Labs 27–28 | Scheduled |

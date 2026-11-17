@@ -19,8 +19,8 @@ You will turn commands into robust, reusable scripts: variables and input, decis
 
 | Day | Lesson | Lab | Status |
 |---|---|---|---|
-| 21 | Variables and User Input | Lab 21 | 2026-11-17 22:00 IST |
-| 22 | Conditions and Loops | Lab 22 | 2026-11-17 22:00 IST |
+| 21 | [Variables and User Input](day-21.md) | [Lab 21](../../labs/lab-21.md) | Published |
+| 22 | [Conditions and Loops](day-22.md) | [Lab 22](../../labs/lab-22.md) | Published |
 | 23 | Functions and Reusable Scripts | Lab 23 | 2026-11-18 22:00 IST |
 | 24 | Text and Data Processing | Lab 24 | 2026-11-18 22:00 IST |
 | 25 | Task Scheduling and Automation | Lab 25 | 2026-11-19 22:00 IST |

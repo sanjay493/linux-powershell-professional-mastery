@@ -1859,3 +1859,172 @@ The entries below cover the Windows baseline-audit and network-investigation cmd
 | **Common errors** | Trusting the process name not its path · forgetting that a beacon is identified by *regular* repeat connections to one address |
 | **Use case** | Incident response: find the process behind a suspicious connection before containing it. |
 | **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection> |
+
+## Scripting
+
+The entries below cover PowerShell scripting fundamentals from Days 21–22: variables, types, scopes and input, then conditions and loops. All work in Windows PowerShell 5.1 and PowerShell 7 unless marked **7.0+**.
+
+### Variables, types and casting
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | Variables hold .NET objects. A type constraint (`[int]$x`) converts and validates every later assignment; `-as` converts or returns `$null`. |
+| **Syntax** | `$name = value` · `[type]$name = value` · `$value -as [type]` · `[type]::TryParse($text, [ref]$out)` |
+| **Parameters** | Common types `[string] [int] [long] [double] [bool] [datetime] [timespan] [ipaddress] [version] [array] [hashtable] [pscustomobject] [securestring]` |
+| **Example** | `[int]$port = 443; $port = '8443'; $port.GetType().Name; '5' + 5; 5 + '5'` |
+| **Expected output** | `Int32` · `55` · `10` (example) |
+| **Equivalent** | Bash `name=value`, `declare -i` (no validation) |
+| **Common errors** | `Cannot convert value "x" to type "System.Int32"` · `"$obj.Prop"` instead of `"$($obj.Prop)"` · `[int]2.5` rounds to `2` (ties to even) |
+| **Use case** | Validating user input cheaply; keeping dates as `[datetime]` for arithmetic. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_variables> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_type_conversion> |
+
+### Get-Variable / New-Variable / Set-Variable / Remove-Variable
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | Inspect and manage variables, including scope and options (`ReadOnly`, `Constant`, `Private`, `AllScope`). |
+| **Syntax** | `Get-Variable [-Name] <String[]> [-Scope <s>] [-ValueOnly]` · <code>New-Variable -Name n -Value v [-Option ReadOnly&#124;Constant] [-Scope s]</code> · `Remove-Variable n [-Force]` · `Clear-Variable n` |
+| **Parameters** | `-Option ReadOnly` (removable with `-Force`) · `-Option Constant` (never removable) · `-Scope Global/Script/Local/Private/N` |
+| **Example** | `New-Variable -Name MaxRetries -Value 3 -Option ReadOnly; $MaxRetries = 5` |
+| **Expected output** | `Cannot overwrite variable MaxRetries because it is read-only or constant.` (example) |
+| **Equivalent** | `readonly`, `declare -p`, `unset` |
+| **Common errors** | Overwriting automatic variables (`$Host`, `$Input`, `$Args`, `$PID`, `$_`) · expecting `Constant` to be set with `Set-Variable` on an existing variable |
+| **Use case** | Script constants; debugging with <code>Get-Variable x &#124; Select-Object *</code>. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/new-variable> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/get-variable> |
+
+### Scopes ($script:, $global:, $using:) and dot-sourcing
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS (`ForEach-Object -Parallel` with `$using:` is **7.0+**) |
+| **Description** | Child scopes read parent variables but assignments create local copies. Scope modifiers target a specific scope; dot-sourcing runs a script in the caller's scope. |
+| **Syntax** | `$script:x` · `$global:x` · `$local:x` · `$private:x` · `$using:x` · `. .\Settings.ps1` |
+| **Parameters** | `$using:` reads a caller variable in `Invoke-Command -ComputerName`, `Start-Job`, `ForEach-Object -Parallel` |
+| **Example** | `$counter = 1; & { $counter = 99 }; $counter` |
+| **Expected output** | `1` (example) |
+| **Equivalent** | Bash subshells, `local`, `source` |
+| **Common errors** | Using `$global:` in scripts (pollutes the session) · empty variables inside jobs/remote blocks (forgot `$using:`) |
+| **Use case** | Sharing a counter across functions in one script with `$script:`. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_scopes> |
+
+### $env: and persistent environment variables
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · names case-insensitive on Windows, **case-sensitive** on Linux/macOS · `User`/`Machine` targets **Windows only** |
+| **Description** | The `Env:` drive exposes process environment variables; .NET methods read and write persistent user/machine values on Windows. |
+| **Syntax** | `$env:NAME` · `$env:NAME = 'v'` · `Remove-Item Env:NAME` · <code>[Environment]::SetEnvironmentVariable(n, v, 'Process'&#124;'User'&#124;'Machine')</code> · `[Environment]::GetEnvironmentVariable(n, target)` |
+| **Parameters** | `Machine` target requires elevation; other processes see persistent changes only after restarting |
+| **Example** | `$env:LOG_LEVEL = 'debug'; pwsh -NoProfile -Command { "child sees [$env:LOG_LEVEL]" }` |
+| **Expected output** | `child sees [debug]` (example) |
+| **Equivalent** | `export NAME=v`; `/etc/environment`, `~/.profile` |
+| **Common errors** | `$env:path` empty on Linux · expecting an already-open terminal to see a new persistent value · storing secrets in environment variables |
+| **Use case** | Per-run configuration (`$env:SITE`), proxy settings, CI variables. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_environment_variables> · <https://learn.microsoft.com/en-us/dotnet/api/system.environment.setenvironmentvariable> |
+
+### Read-Host / Get-Credential
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-MaskInput` **7.1+** · `Get-Credential` shows a GUI dialog in 5.1 and a console prompt in 7 |
+| **Description** | Prompt a person for input. `Read-Host` returns a string (or `SecureString`); `Get-Credential` returns a `PSCredential` for `-Credential` parameters. |
+| **Syntax** | `Read-Host [[-Prompt] <Object>] [-AsSecureString]` · `Read-Host -Prompt p -MaskInput` · `Get-Credential [-UserName u] [-Message m]` |
+| **Parameters** | `-AsSecureString` returns `SecureString`, shows `*` · `-MaskInput` shows `*`, returns plain string |
+| **Example** | `$p = Read-Host -Prompt 'Port'; $n = 0; [int]::TryParse($p, [ref]$n)` |
+| **Expected output** | `Port: 8443` · `True` (example) |
+| **Equivalent** | `read -r -p 'Port: ' p` · `read -r -s` |
+| **Common errors** | *Read and Prompt functionality is not available* under `-NonInteractive` · treating the result as a number without converting · `SecureString` is **not encrypted** on Linux/macOS |
+| **Use case** | Interactive helper scripts; never for unattended jobs (use parameters or a secret store). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/read-host> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.security/get-credential> |
+
+### Write-Output / Write-Host / Write-Information and the -f operator
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS (`Write-Host` uses the information stream since 5.0) |
+| **Description** | `Write-Output` sends objects down the pipeline; `Write-Host` writes to the console; `Write-Information`/`Write-Verbose` send status messages to streams 6/4. `-f` formats strings. |
+| **Syntax** | `Write-Output <obj>` · `Write-Information -MessageData m` · `'{0,-10} {1,5:N1}' -f $a, $b` |
+| **Parameters** | `{index[,align][:format]}` · formats `N2`, `P1`, `D2`, `X`, `yyyy-MM-dd` · `-InformationAction Continue` to show information messages |
+| **Example** | <code>'{0,-10}&#124;{1,5}&#124;{2,6:N2}%' -f 'disk', 42, 85.123</code> |
+| **Expected output** | <code>disk      &#124;   42&#124; 85.12%</code> (example; separators follow the current culture) |
+| **Equivalent** | <code>printf '%-10s&#124;%5d&#124;%6.2f%%\n'</code> · `echo` |
+| **Common errors** | Returning data with `Write-Host` (cannot be captured) · forgetting that `-f` output is a string |
+| **Use case** | Aligned report lines (Labs 21–22). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/write-output> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/write-information> · <https://learn.microsoft.com/en-us/dotnet/standard/base-types/composite-formatting> |
+
+### param() with validation attributes, $args, Set-StrictMode
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | A `param()` block declares named, typed, validated script parameters; validation runs before the script body and again on later assignments. `Set-StrictMode` errors on undefined variables and missing properties. |
+| **Syntax** | `param([Parameter(Mandatory)][ValidatePattern('re')][string]$Name, [ValidateRange(1,65535)][int]$Port = 443, [ValidateSet('A','B')][string]$Mode)` · `Set-StrictMode -Version Latest` |
+| **Parameters** | `Mandatory` · `ValidateSet` (adds tab completion) · `ValidateRange` · `ValidatePattern` (case-insensitive) · `ValidateNotNullOrEmpty` · `$PSBoundParameters` · `$PSScriptRoot` |
+| **Example** | `.\Check-Args.ps1 -ComputerName web-01 -Port 70000` |
+| **Expected output** | `Cannot validate argument on parameter 'Port'. The 70000 argument is greater than the maximum allowed range of 65535.` (example) |
+| **Equivalent** | `"${1:?usage}"`, `[[ $x =~ re ]]`, `set -o nounset`; `getopts` (Day 23) |
+| **Common errors** | `Mandatory` in scheduled tasks (fails non-interactively) · using `$args` for anything beyond quick tests |
+| **Use case** | Every reusable script in the Script Library. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/set-strictmode> |
+
+### if / comparison operators
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · ternary `?:`, `??`, `??=`, `&&`/<code>&#124;&#124;</code> chains **7.0+** |
+| **Description** | `if`/`elseif`/`else` on truthy values. Comparison operators are case-insensitive for strings by default; collections on the left **filter**. |
+| **Syntax** | `if ($a -ge 90) { } elseif ($a -ge 80) { } else { }` · `-eq -ne -gt -ge -lt -le -like -match -contains -in -is` · `-ceq -clike -cmatch` · `-and -or -not` |
+| **Parameters** | `$Matches` after a scalar `-match` · `$null -eq $x` for null tests |
+| **Example** | `'10' -lt '9'; 10 -lt '9'; @(1,2,3,2) -eq 2; @(1,2,3) -contains 2` |
+| **Expected output** | `True` · `False` · `2 2` · `True` (example) |
+| **Equivalent** | `[[ ]]`, `(( ))`, `=~`/`BASH_REMATCH`, `test` |
+| **Common errors** | `if ($a > 5)` (redirection, creates file `5`) · `$x -eq $null` with arrays · string vs number comparison decided by the left operand |
+| **Use case** | Thresholds, validation and pre-flight checks. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_if> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_comparison_operators> |
+
+### switch
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | Multi-way branch that tests **every** branch (unless `break`), loops over arrays, and can read a file line by line. |
+| **Syntax** | <code>switch [-Wildcard&#124;-Regex&#124;-Exact] [-CaseSensitive] (&lt;value&gt;) { &lt;pattern&gt; { … } default { … } }</code> · `switch -File <path> { … }` |
+| **Parameters** | `-Wildcard` `-like` patterns · `-Regex` regex, sets `$Matches` · `-CaseSensitive` · script-block conditions `{ $_ -gt 90 }` · `break` / `continue` |
+| **Example** | `switch (5) { { $_ -gt 1 } { 'gt1' } { $_ -gt 3 } { 'gt3' } default { 'none' } }` |
+| **Expected output** | `gt1` · `gt3` (example) |
+| **Equivalent** | `case … esac` |
+| **Common errors** | Forgetting `break` (several branches run) · expecting Bash-style first-match-only |
+| **Use case** | Classifying log lines, file types and answers (Lab 22). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_switch> |
+
+### for / foreach / while / do / break / continue
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | Loop statements. `foreach` iterates a collection in memory; `do` loops test after the body; labels let `break`/`continue` target an outer loop. |
+| **Syntax** | `for ($i=0; $i -lt $n; $i++) { }` · `foreach ($x in $list) { }` · `while ($c) { }` · `do { } while ($c)` · `do { } until ($c)` · `:outer foreach (…) { break outer }` |
+| **Parameters** | `break [label]` · `continue [label]` · range operator `1..10` |
+| **Example** | `$tries = 0; do { $tries++; "attempt $tries" } until ($tries -ge 3)` |
+| **Expected output** | `attempt 1` · `attempt 2` · `attempt 3` (example) |
+| **Equivalent** | `for`, `while`, `until`, `break N`, `continue N` |
+| **Common errors** | Unbounded `while ($true)` waits · modifying a collection while iterating it |
+| **Use case** | Retry loops with backoff; fleet checks. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_foreach> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_do> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_break> |
+
+### ForEach-Object (and -Parallel)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-Parallel`, `-ThrottleLimit`, `-TimeoutSeconds` **7.0+** · aliases `%`, `foreach` |
+| **Description** | Runs a script block for each pipeline object, streaming. `-Begin`/`-End` run once. `-Parallel` runs iterations in separate runspaces. |
+| **Syntax** | <code>… &#124; ForEach-Object [-Begin {…}] [-Process] {…} [-End {…}]</code> · <code>… &#124; ForEach-Object -Parallel {…} [-ThrottleLimit 5] [-TimeoutSeconds N]</code> |
+| **Parameters** | `$_`/`$PSItem` current object · `$using:var` inside `-Parallel` · `return` skips to the next item |
+| **Example** | <code>1..5 &#124; ForEach-Object { if ($_ -eq 3) { return }; "item $_" }</code> |
+| **Expected output** | `item 1` · `item 2` · `item 4` · `item 5` (example) |
+| **Equivalent** | `while read …; done < <(cmd)`; `xargs -P` for parallel |
+| **Common errors** | `break`/`continue` inside the script block stop the enclosing loop or the whole script · output order not guaranteed with `-Parallel` |
+| **Use case** | Streaming large logs; parallel port checks across many hosts (7.0+). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/foreach-object> |

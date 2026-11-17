@@ -698,4 +698,4 @@ Get-Content "$env:SystemRoot\System32\LogFiles\Firewall\pfirewall.log" -Tail 50
 
 ---
 
-**Previous:** [Day 19: System Security Auditing](day-19.md) · **Next:** Day 21: Variables and User Input (see the [release schedule](../schedule.md))
+**Previous:** [Day 19: System Security Auditing](day-19.md) · **Next:** [Day 21: Variables and User Input](../module-5/day-21.md)
