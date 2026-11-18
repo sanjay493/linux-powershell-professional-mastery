@@ -32,6 +32,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 20 | [Network Security Investigation](../course/module-4/day-20.md#quiz) |
 | 21 | [Variables and User Input](../course/module-5/day-21.md#quiz) |
 | 22 | [Conditions and Loops](../course/module-5/day-22.md#quiz) |
+| 23 | [Functions and Reusable Scripts](../course/module-5/day-23.md#quiz) |
+| 24 | [Text and Data Processing](../course/module-5/day-24.md#quiz) |
 
 ## Module tests
 

@@ -55,8 +55,8 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 |---|---|---|
 | 21 | [Variables and User Input](module-5/day-21.md) | `read` `echo` `export` · `Read-Host` `Write-Output` · scope, types |
 | 22 | [Conditions and Loops](module-5/day-22.md) | `if` `case` `for` `while` · `if` `switch` `foreach` `ForEach-Object` |
-| 23 | Functions and Reusable Scripts | Bash functions · advanced functions, `param()`, `try/catch` |
-| 24 | Text and Data Processing | `awk` `sed` `cut` `sort` `uniq` · `Group-Object` `Sort-Object` · CSV and JSON |
+| 23 | [Functions and Reusable Scripts](module-5/day-23.md) | Bash functions · advanced functions, `param()`, `try/catch` |
+| 24 | [Text and Data Processing](module-5/day-24.md) | `awk` `sed` `cut` `sort` `uniq` · `Group-Object` `Sort-Object` · CSV and JSON |
 | 25 | Task Scheduling and Automation | `cron` `crontab` systemd timers · Task Scheduler, `Register-ScheduledTask` |
 
 ## Module 6 — [Professional Operations & Projects](module-6/index.md)

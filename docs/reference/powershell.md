@@ -1862,7 +1862,7 @@ The entries below cover the Windows baseline-audit and network-investigation cmd
 
 ## Scripting
 
-The entries below cover PowerShell scripting fundamentals from Days 21–22: variables, types, scopes and input, then conditions and loops. All work in Windows PowerShell 5.1 and PowerShell 7 unless marked **7.0+**.
+The entries below cover PowerShell scripting from Days 21–23: variables, types, scopes and input, conditions and loops, then functions, advanced functions, error handling and modules. All work in Windows PowerShell 5.1 and PowerShell 7 unless marked **7.0+**.
 
 ### Variables, types and casting
 
@@ -2028,3 +2028,142 @@ The entries below cover PowerShell scripting fundamentals from Days 21–22: var
 | **Common errors** | `break`/`continue` inside the script block stop the enclosing loop or the whole script · output order not guaranteed with `-Parallel` |
 | **Use case** | Streaming large logs; parallel port checks across many hosts (7.0+). |
 | **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/foreach-object> |
+
+### function / advanced functions ([CmdletBinding()], [Parameter()])
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS · `-ProgressAction` common parameter **7.4+** · `clean {}` block **7.3+** |
+| **Description** | Named script blocks with typed, validated parameters. `[CmdletBinding()]` or any `[Parameter()]` attribute makes an **advanced function**: common parameters (`-Verbose`, `-ErrorAction`, …), unknown parameters rejected, `$PSCmdlet` available. |
+| **Syntax** | `function Verb-Noun { [CmdletBinding()] [OutputType([type])] param([Parameter(Mandatory, Position = 0, ValueFromPipelineByPropertyName)][ValidateRange(1,65535)][int]$Port) begin {} process {} end {} }` |
+| **Parameters** | `Mandatory`, `Position`, `ValueFromPipeline`, `ValueFromPipelineByPropertyName`, `ParameterSetName`, `HelpMessage` · `[Alias()]`, `[ValidateSet()]`, `[ValidatePattern()]`, `[ValidateScript()]`, `[ValidateNotNullOrEmpty()]` · `$PSBoundParameters` |
+| **Example** | `Test-TcpPort -HostName 127.0.0.1 -Port 99999` (Day 23 Demo 4) |
+| **Expected output** | `Test-TcpPort: Cannot validate argument on parameter 'Port'. The 99999 argument is greater than the maximum allowed range of 65535. …` (example, 7.4) |
+| **Equivalent** | Bash `name() { … }` + `getopts` + hand-written validation |
+| **Common errors** | Pipeline parameter without a `process` block (only the last object is handled) · stray output (`$list.Add()`) polluting results · `Format-Table` at the end of a function · unapproved verbs · `exit` inside a function |
+| **Use case** | Reusable, discoverable tools for colleagues (`Get-Help` works on them). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_functions_advanced_parameters> |
+
+### Comment-based help, Write-Verbose and SupportsShouldProcess (-WhatIf / -Confirm)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS |
+| **Description** | A `<# .SYNOPSIS … #>` block becomes `Get-Help` output. `Write-Verbose` messages appear with `-Verbose`. `SupportsShouldProcess` adds `-WhatIf`/`-Confirm`; wrap each change in `$PSCmdlet.ShouldProcess(target, action)`. |
+| **Syntax** | `<# .SYNOPSIS … .DESCRIPTION … .PARAMETER Name … .EXAMPLE … .OUTPUTS … .NOTES … #>` · `[CmdletBinding(SupportsShouldProcess, ConfirmImpact = 'Medium')]` · `if ($PSCmdlet.ShouldProcess($t, 'Delete')) { … }` |
+| **Parameters** | `ConfirmImpact` Low/Medium/High vs `$ConfirmPreference` (default High) · `$WhatIfPreference` |
+| **Example** | `Remove-StaleReport -Path .\reports -OlderThanDays 30 -WhatIf` |
+| **Expected output** | `What if: Performing the operation "Delete report" on target "C:\Users\student\day23\reports\old.csv".` (example) |
+| **Equivalent** | Bash: a `usage()` function and a hand-written `-n` dry-run option |
+| **Common errors** | Declaring `SupportsShouldProcess` but never calling `ShouldProcess` (`-WhatIf` silently does nothing) · help block placed in the wrong position · `Write-Host` for diagnostics |
+| **Use case** | Safe clean-up and change functions for the service desk. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_comment_based_help> · <https://learn.microsoft.com/en-us/powershell/scripting/learn/deep-dives/everything-about-shouldprocess> |
+
+### throw / Write-Error / $ErrorActionPreference (error handling in functions)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `$PSNativeCommandUseErrorActionPreference` **7.4+** |
+| **Description** | `throw` raises a terminating error; `Write-Error` a non-terminating one. `try`/`catch` only catches terminating errors, so use `-ErrorAction Stop` or `$ErrorActionPreference = 'Stop'`. A bare `throw` in `catch` re-throws. |
+| **Syntax** | `throw "message"` · `Write-Error -Message "…" [-ErrorAction Stop]` · `try { … } catch [System.Management.Automation.ItemNotFoundException] { … } catch { $_.Exception.Message } finally { … }` |
+| **Parameters** | `$_.Exception.Message`, `$_.FullyQualifiedErrorId`, `$_.InvocationInfo.PositionMessage` · `$PSCmdlet.ThrowTerminatingError()` · `$LASTEXITCODE` for native programs |
+| **Example** | `try { Get-Content .\missing.txt -ErrorAction Stop } catch { $_.FullyQualifiedErrorId }` |
+| **Expected output** | `PathNotFound,Microsoft.PowerShell.Commands.GetContentCommand` (example) |
+| **Equivalent** | Bash exit statuses, <code>cmd &#124;&#124; die</code>, `trap … ERR`, `set -o errexit` |
+| **Common errors** | `catch` never runs (non-terminating error) · swallowing errors with an empty `catch {}` · `-ErrorAction SilentlyContinue` hiding real failures |
+| **Use case** | Turning "file not found" into one clear message and a non-zero exit code in a wrapper script. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_try_catch_finally> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_throw> |
+
+### Script modules (Import-Module / Export-ModuleMember / New-ModuleManifest)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · user module folders: 5.1 `$HOME\Documents\WindowsPowerShell\Modules`, 7 on Windows `$HOME\Documents\PowerShell\Modules`, 7 on Linux `~/.local/share/powershell/Modules` |
+| **Description** | A folder `Name\` with `Name.psm1` (functions) and `Name.psd1` (manifest). `Export-ModuleMember` chooses public functions; modules in `$env:PSModulePath` auto-load. |
+| **Syntax** | `Export-ModuleMember -Function A, B` · `New-ModuleManifest -Path .\Mod\Mod.psd1 -RootModule Mod.psm1 -ModuleVersion 1.0.0 -FunctionsToExport A, B` · `Import-Module .\Mod [-Force] [-Prefix X]` · `Get-Command -Module Mod` · `Remove-Module Mod` |
+| **Parameters** | `-Force` reload after edits · `-Prefix` rename nouns · `Test-ModuleManifest` validate |
+| **Example** | `Import-Module .\OpsTools -Force; Get-Command -Module OpsTools` |
+| **Expected output** | `Function  Get-DiskUsedPercent  1.0.0  OpsTools` · `Function  Test-DiskThreshold  1.0.0  OpsTools` (example) |
+| **Equivalent** | `source lib.sh` with a load guard |
+| **Common errors** | Folder name ≠ module name (no auto-load) · stale module in the session (use `-Force`) · `FunctionsToExport = '*'` (slow discovery) · execution policy blocks the `.psm1` on Windows |
+| **Use case** | A versioned team toolkit installed on every admin workstation. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_modules> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/new-modulemanifest> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/import-module> |
+
+## Text & Data Processing
+
+Day 24 entries. All work in Windows PowerShell 5.1 and PowerShell 7 unless marked; regular expressions are .NET and **case-insensitive** by default.
+
+### -split / -replace / -join / -match
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · all OS (`-creplace`, `-csplit`, `-cmatch` case-sensitive) |
+| **Description** | Regex-based text operators: split into an array, replace with group references, join an array, test and capture into `$Matches`. |
+| **Syntax** | `$s -split '\s+'` · `$s -replace 're', 'rep'` · `$a -join ','` · `$s -match '^(?<ip>\S+)'` |
+| **Parameters** | `$1`, `${1}`, `${name}` in **single-quoted** replacements · `$Matches[1]`, `$Matches.name` · `-split 're', N` (max parts) |
+| **Example** | `'log_level = info' -replace '^(log_level\s*=\s*).*', '${1}debug'` |
+| **Expected output** | `log_level = debug` (example) |
+| **Equivalent** | `sed -E 's/…/\1…/'`, `cut`, `paste -sd,`, `[[ =~ ]]` + `BASH_REMATCH` |
+| **Common errors** | Double-quoted replacement (`"$1"` expands a variable) · `$130` instead of `${1}30` · `-match` on an array filters and does not set `$Matches` reliably · forgetting that `.` and `\` are regex characters |
+| **Use case** | Parsing access-log lines into objects; masking IP addresses. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_split> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_join> · <https://learn.microsoft.com/en-us/dotnet/standard/base-types/substitutions-in-regular-expressions> |
+
+### Sort-Object and calculated properties
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-Top`, `-Bottom`, `-Stable` **7.0+** · alias `sort` on Windows only |
+| **Description** | Sorts objects by one or more properties or script blocks; calculated properties (`@{N=…; E={…}}`) rename or compute values for `Select-Object`, `Sort-Object` and `Format-Table`. |
+| **Syntax** | `Sort-Object [-Property] <Object[]> [-Descending] [-Unique] [-CaseSensitive]` · `Select-Object Name, @{Name = 'MiB'; Expression = { $_.Bytes / 1MB }}` |
+| **Parameters** | Per-key direction: `@{Expression = 'Count'; Descending = $true}, @{Expression = 'Name'; Descending = $false}` · numeric sort of strings: `{ [int]$_.disk_pct }` |
+| **Example** | <code>Import-Csv .\servers.csv &#124; Sort-Object { [int]$_.disk_pct } -Descending &#124; Select-Object -First 3 name, disk_pct</code> |
+| **Expected output** | `file-01 97` · `web-02 93` · `db-01 88` (example) |
+| **Equivalent** | `sort -t, -k5,5nr`, `awk` computed columns |
+| **Common errors** | Sorting CSV numbers as text · `-Unique` is case-insensitive · expecting stable tie order in 5.1 |
+| **Use case** | Top-N reports; ranking disks, clients or alerts. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/sort-object> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_calculated_properties> |
+
+### Import-Csv / Export-Csv / ConvertFrom-Csv / ConvertTo-Csv
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-UseQuotes`, `-QuoteFields` **7.0+** · `-IncludeTypeInformation` **6.0+** |
+| **Description** | CSV files/text ↔ objects with proper quoting (commas and newlines inside quotes). All imported values are **strings**. |
+| **Syntax** | `Import-Csv [-Path] <String[]> [-Delimiter <Char>] [-Header <String[]>] [-Encoding <enc>]` · `Export-Csv [-Path] <String> -NoTypeInformation [-Encoding UTF8] [-Append] [-Delimiter <Char>]` |
+| **Parameters** | **5.1:** `#TYPE` line unless `-NoTypeInformation`; default encoding ASCII; every field quoted · **7:** no type line, UTF-8 without BOM, `-UseQuotes Always/AsNeeded/Never` |
+| **Example** | `(Import-Csv .\tricky.csv).notes` |
+| **Expected output** | `rebuilt, needs patch` (example) |
+| **Equivalent** | Python `csv` module, `gawk --csv` (gawk 5.3+); `cut`/`awk -F,` only for unquoted CSV |
+| **Common errors** | Comparing string values as numbers · `Format-Table` before `Export-Csv` · arrays in a property (`System.Object[]`) · wrong `-Delimiter` for European exports |
+| **Use case** | Inventories, access reviews, reports for spreadsheets. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/import-csv> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/export-csv> |
+
+### ConvertFrom-Json / ConvertTo-Json
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-AsHashtable` **6.0+** · `-AsArray` **6.2+** · different JSON engines (messages and date formats differ) |
+| **Description** | JSON text ↔ objects. `ConvertTo-Json` serialises only **2 levels** by default. |
+| **Syntax** | <code>Get-Content f.json -Raw &#124; ConvertFrom-Json</code> · <code>$obj &#124; ConvertTo-Json -Depth 5 [-Compress]</code> |
+| **Parameters** | `-Depth` (max 100) · `-Compress` one line · `-AsHashtable` · 5.1 top-level arrays arrive as **one** object — wrap in parentheses to enumerate |
+| **Example** | <code>(Get-Content .\alerts.json -Raw &#124; ConvertFrom-Json) &#124; Where-Object severity -eq 'critical' &#124; ForEach-Object host</code> |
+| **Expected output** | `web-02` · `file-01` (example) |
+| **Equivalent** | `jq` |
+| **Common errors** | Missing `-Raw` in 5.1 · nested data flattened to `"System.Collections.Hashtable"` without `-Depth` · 5.1 `"\/Date(…)\/"` dates |
+| **Use case** | Reading API and monitoring output; writing findings files. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertfrom-json> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertto-json> |
+
+### ConvertTo-Html / Join-String
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | `ConvertTo-Html` 5.1, 7.x · `Join-String` **7.0+** |
+| **Description** | `ConvertTo-Html` turns objects into an HTML table page; `Join-String` joins pipeline objects (or a property of them) into one string. |
+| **Syntax** | <code>$rows &#124; ConvertTo-Html [-Property …] [-Title …] [-PreContent …] [-Head …]</code> · <code>… &#124; Join-String [-Property name] [-Separator ',']</code> |
+| **Parameters** | `-Fragment` (table only) · `-PostContent` · `Join-String -SingleQuote`/`-DoubleQuote` |
+| **Example** | <code>Import-Csv .\servers.csv &#124; Join-String -Property name -Separator ','</code> |
+| **Expected output** | `web-01,web-02,db-01,dc-01,file-01` (example, 7.x) |
+| **Equivalent** | `paste -sd,`; hand-written HTML |
+| **Common errors** | Writing HTML from formatted (`Format-Table`) output · using `Join-String` in 5.1 (use `-join`) |
+| **Use case** | E-mailable capacity and alert reports. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertto-html> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/join-string> |

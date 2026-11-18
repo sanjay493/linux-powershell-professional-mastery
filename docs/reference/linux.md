@@ -1926,7 +1926,7 @@ The entries below cover the baseline-audit and network-investigation toolkit fro
 
 ## Scripting
 
-The entries below cover Bash scripting fundamentals from Days 21–22: variables and input, then conditions and loops. They are shell built-ins and keywords (Bash 5.2 on Ubuntu 24.04) unless noted; none needs root.
+The entries below cover Bash scripting from Days 21–23: variables and input, conditions and loops, then functions, option parsing, cleanup and libraries. They are shell built-ins and keywords (Bash 5.2 on Ubuntu 24.04) unless noted; none needs root.
 
 ### Variables and parameter expansion
 
@@ -2092,3 +2092,157 @@ The entries below cover Bash scripting fundamentals from Days 21–22: variables
 | **Common errors** | Forgetting that 124 means "timed out" not "failed" · wrapping a shell built-in directly (`timeout 2 read …` fails; wrap `bash -c`) |
 | **Use case** | Bounding network probes inside loops: `timeout 2 bash -c 'exec 3<>"/dev/tcp/$1/$2"' _ "$host" "$port"`. |
 | **Docs** | <https://man7.org/linux/man-pages/man1/timeout.1.html> · <https://man7.org/linux/man-pages/man1/seq.1.html> |
+
+### Functions (name() { }, local, return)
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash keywords/built-ins (`function name { }` form is Bash/ksh only; POSIX `sh` has `name() { }`) |
+| **Description** | Named, reusable blocks. Arguments arrive as `$1`…, `"$@"`, `$#`; variables are global unless declared `local`; the status (0–255) is the verdict, data is printed on stdout. |
+| **Syntax** | `name() { …; }` · `function name { …; }` · `local [-r] VAR[=VALUE]` · `return [N]` · `declare -f [NAME]` · `declare -F` · `unset -f NAME` |
+| **Parameters** | `${FUNCNAME[0]}` current function · `${BASH_SOURCE[0]}` file it came from · `export -f` share with child Bash processes |
+| **Example** | <code>is_over() { (( $1 &gt;= $2 )); }; pct=$(df -P / &#124; awk 'NR==2 {sub(/%/,"",$5); print $5}'); is_over "$pct" 90 &amp;&amp; echo ALERT &#124;&#124; echo OK</code> |
+| **Expected output** | `OK` (captured, root filesystem 23 % used) · `bad() { return 300; }; bad; echo $?` → `44` (captured) |
+| **Equivalent** | `function Verb-Noun { param() … }`; advanced functions with `[CmdletBinding()]` |
+| **Common errors** | Missing `local` (caller's variables overwritten) · `local x=$(cmd)` hides the status (SC2155) · progress text on stdout pollutes `$(f)` · calling before defining · dynamic scoping surprises |
+| **Use case** | Shared helpers such as `log`, `die`, `require_cmd`, `check_tcp` (Lab 23). |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Shell-Functions.html> · <https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html> |
+
+### getopts (option parsing)
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash built-in (POSIX); short options only — `getopt` (util-linux) is a different program for long options |
+| **Description** | Parses `-x` / `-x VALUE` options one per call in a `while` loop; then `shift $((OPTIND - 1))` leaves the operands in `"$@"`. |
+| **Syntax** | `while getopts ':hf:t:' opt; do case $opt in …; esac; done; shift $((OPTIND - 1))` |
+| **Parameters** | Letter + `:` takes a value (`OPTARG`) · leading `:` = silent mode: `opt=?` unknown option, `opt=:` missing value (letter in `OPTARG`) · `OPTIND` next index · `--` ends options · `local OPTIND=1` inside functions |
+| **Example** | `./portcheck.sh -H 127.0.0.1 -t; echo $?` and `./portcheck.sh -x; echo $?` (Day 23 Demo 4) |
+| **Expected output** | `portcheck.sh: option -t needs a value (try -h)` · `1` · `portcheck.sh: unknown option -x (try -h)` · `1` (captured) |
+| **Equivalent** | PowerShell parameter binder: `param([Parameter(Mandatory)][ValidateRange(1,30)][int]$TimeoutSec)` |
+| **Common errors** | No leading `:` (Bash prints `illegal option -- x` too) · forgetting `shift $((OPTIND-1))` · `getopts` in a function called twice without `local OPTIND=1` |
+| **Use case** | Scripts run by cron, systemd and CI with documented options and exit codes. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html> · <https://man7.org/linux/man-pages/man1/getopts.1p.html> |
+
+### trap / mktemp (cleanup)
+
+| Field | Detail |
+|---|---|
+| **OS** | `trap` Bash built-in; `mktemp` coreutils |
+| **Description** | `trap` runs code on `EXIT`, `ERR` or a signal (`INT`, `TERM`); `mktemp` creates a unique temp file/directory (mode 0600/0700). Together they guarantee cleanup. |
+| **Syntax** | `trap 'cmds' EXIT ERR INT TERM` · `trap - EXIT` · `trap -p` · `mktemp [-d] [TEMPLATE.XXXXXX]` |
+| **Parameters** | `$BASH_COMMAND`, `$LINENO` in an `ERR` trap · `set -o errtrace` (`-E`) to inherit `ERR` in functions · `SIGKILL` cannot be trapped |
+| **Example** | `tmp=$(mktemp -d "${TMPDIR:-/tmp}/report.XXXXXX"); trap 'rm -rf -- "$tmp"' EXIT` |
+| **Expected output** | (no output) — the directory disappears on normal exit, `exit N`, errexit, `kill -TERM` (status 143) and Ctrl+C (captured in Lab 23) |
+| **Equivalent** | `try { } finally { }`; `clean { }` block (PowerShell 7.3+) |
+| **Common errors** | Fixed names like `/tmp/out.txt` (races, symlink attacks) · no `EXIT` trap · expecting cleanup after `kill -9` · `ERR` trap not firing in functions without `set -E` |
+| **Use case** | Build a report in a temp file and `mv` it into place atomically. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Bourne-Shell-Builtins.html> · <https://man7.org/linux/man-pages/man1/mktemp.1.html> · <https://man7.org/linux/man-pages/man7/signal.7.html> |
+
+### source / libraries / main guard / flock
+
+| Field | Detail |
+|---|---|
+| **OS** | `source`/`.` Bash built-ins; `flock` util-linux |
+| **Description** | `source FILE` runs a library in the current shell. A load guard makes repeated sourcing harmless; the main guard lets a script be sourced for testing; `flock` prevents overlapping runs. |
+| **Syntax** | `here=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd); source "$here/../lib/opslib.sh"` · `[[ -n ${_LIB_LOADED:-} ]] && return 0` · `[[ ${BASH_SOURCE[0]} == "$0" ]] && main "$@"` · `exec 9>LOCK; flock -n 9` |
+| **Parameters** | `# shellcheck shell=bash` / `# shellcheck source=PATH` directives · `flock -n` (fail at once) · `-w SECS` (wait) |
+| **Example** | `bash -c 'source bin/disk-alert.sh; type -t main'` |
+| **Expected output** | `function` — functions defined, `main` not run (captured) |
+| **Equivalent** | `Import-Module .\Mod` (`.psm1` + `.psd1`); dot-sourcing `. .\lib.ps1` |
+| **Common errors** | Sourcing by a path relative to the current directory · libraries that do work at load time · world-writable library used by a root job (privilege escalation) |
+| **Use case** | One `opslib.sh` shared by every operations script. |
+| **Docs** | <https://www.gnu.org/software/bash/manual/html_node/Bash-Builtins.html> · <https://man7.org/linux/man-pages/man1/flock.1.html> |
+
+## Text & Data Processing
+
+Day 24 entries. All tools are part of a standard Ubuntu 24.04 installation except `jq` (package `jq`, universe) and `gawk` (optional). Ubuntu's `awk` is **mawk**. None needs root.
+
+### cut
+
+| Field | Detail |
+|---|---|
+| **OS** | coreutils |
+| **Description** | Prints selected fields (by a single-character delimiter) or character positions of each line. |
+| **Syntax** | `cut -d DELIM -f LIST [FILE…]` · `cut -c LIST [FILE…]` |
+| **Parameters** | `-f 1,3` / `2-4` / `3-` · `-d` (default tab) · `-c` characters · `--complement` (GNU) · `-s` only lines containing the delimiter |
+| **Example** | <code>cut -d: -f1,7 /etc/passwd &#124; head -3</code> |
+| **Expected output** | `root:/bin/bash` · `daemon:/usr/sbin/nologin` · `bin:/usr/sbin/nologin` (captured) |
+| **Equivalent** | `($line -split ':')[0,6]`; `Import-Csv -Delimiter ':' -Header …` |
+| **Common errors** | Runs of spaces create empty fields (use `awk`) · quoted CSV fields with commas are split |
+| **Use case** | Fixed-delimiter system files and simple CSV columns. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/cut.1.html> |
+
+### sort / uniq
+
+| Field | Detail |
+|---|---|
+| **OS** | coreutils |
+| **Description** | `sort` orders lines (text, numeric, human sizes, versions, by key); `uniq` collapses **adjacent** duplicates and counts them. |
+| **Syntax** | <code>sort [-n&#124;-h&#124;-V] [-r] [-u] [-s] [-t SEP] [-k POS1[,POS2]] [FILE…]</code> · <code>uniq [-c] [-d&#124;-u] [-i]</code> |
+| **Parameters** | `-k5,5nr` field 5 only, numeric, reverse · `-t,` separator · `-u` unique · `-s` stable · `LC_ALL=C` byte order · `uniq -c` count, `-d` duplicates only |
+| **Example** | <code>awk '{print $9}' web.log &#124; sort &#124; uniq -c &#124; sort -k1,1nr -k2,2n</code> |
+| **Expected output** | `5 200` · `3 401` · `2 404` · `2 500` (captured, counts right-aligned) |
+| **Equivalent** | <code>Group-Object -NoElement &#124; Sort-Object Count -Descending</code>; `Sort-Object { [int]$_.x }` |
+| **Common errors** | `uniq` without `sort` · `-k2` (= to end of line) instead of `-k2,2` · text sort of numbers (`10 100 9`) · different locales for `sort` and `join` · unexpected tie order with `-rn` |
+| **Use case** | Top talkers, status distributions, de-duplicated lists. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/sort.1.html> · <https://man7.org/linux/man-pages/man1/uniq.1.html> |
+
+### tr / paste / join
+
+| Field | Detail |
+|---|---|
+| **OS** | coreutils |
+| **Description** | `tr` translates/deletes/squeezes characters (stdin only); `paste` merges lines side by side or joins one file's lines; `join` joins two sorted files on a key. |
+| **Syntax** | `tr [-d] [-s] SET1 [SET2]` · `paste [-d LIST] [-s] FILE…` · `join [-t SEP] [-1 F] [-2 F] [-a 1] FILE1 FILE2` |
+| **Parameters** | `tr -d '\r'` strip CRLF · `tr -s ' '` squeeze · `tr '[:upper:]' '[:lower:]'` · `paste -sd,` · `join -t,` (both inputs sorted on the key, same locale) |
+| **Example** | <code>cut -d, -f1 servers.csv &#124; tail -n +2 &#124; paste -sd,</code> |
+| **Expected output** | `web-01,web-02,db-01,dc-01,file-01` (captured) |
+| **Equivalent** | `.ToLower()`, <code>-replace "&#96;r", ''</code>, `-join ','`, hashtable lookup for joins |
+| **Common errors** | `tr` given a file name (it reads stdin) · `join: file 1 is not in sorted order` |
+| **Use case** | Fixing Windows CSVs, building comma lists, matching alerts to owners. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/tr.1.html> · <https://man7.org/linux/man-pages/man1/paste.1.html> · <https://man7.org/linux/man-pages/man1/join.1.html> |
+
+### sed
+
+| Field | Detail |
+|---|---|
+| **OS** | GNU sed 4.9 (Ubuntu); `-i` without a backup suffix and `\s`/`I` are GNU extensions |
+| **Description** | Stream editor: substitutes, prints or deletes lines selected by number, range or regex; `-i` edits files in place. |
+| **Syntax** | `sed [-n] [-E] [-i[SUFFIX]] [-e SCRIPT]… [FILE…]` |
+| **Parameters** | `s/re/rep/g` · `\1`–`\9`, `&` · `-n` + `p` · `d` · addresses `5`, `$`, `/re/`, `10,20` · `-E` extended regex · `-i.bak` backup · any `s` delimiter (`s#a#b#`) |
+| **Example** | <code>sed -E 's/^(log_level[[:space:]]*=[[:space:]]*).*/\1debug/' app.conf &#124; diff app.conf -</code> |
+| **Expected output** | `3c3` · `< log_level = info` · `---` · `> log_level = debug` (captured preview) |
+| **Equivalent** | `(Get-Content f) -replace '^(log_level\s*=\s*).*', '${1}debug'` + `Compare-Object` |
+| **Common errors** | `sed -i` without preview/backup · unescaped `.` in IPs · `/` inside the pattern · `\1` without `-E` or `\( \)` · `-n` with `-i` empties the file |
+| **Use case** | One-line configuration changes with validation; masking IPs before sharing logs. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/sed.1.html> · <https://www.gnu.org/software/sed/manual/sed.html> |
+
+### awk
+
+| Field | Detail |
+|---|---|
+| **OS** | `awk` = **mawk 1.3.4** on Ubuntu 24.04; `gawk` optional (`asort`, `FPAT`, `gensub`, `--csv` are gawk-only) |
+| **Description** | Pattern-action language for fields: filter rows, compute, count and sum per key, print formatted reports. |
+| **Syntax** | `awk [-F SEP] [-v VAR=VAL] 'BEGIN {…} pattern {action} END {…}' [FILE…]` |
+| **Parameters** | `$1…$NF`, `NR`, `FNR`, `NF`, `FS`/`-F`, `OFS` · arrays `c[$1]++` · `printf` · `split()`, `sub()`, `gsub()`, `substr()`, `length()`, `tolower()` |
+| **Example** | <code>awk '{bytes[$1] += $10; hits[$1]++} END {for (ip in bytes) printf "%-15s %3d hits %7d bytes\n", ip, hits[ip], bytes[ip]}' web.log &#124; sort -k4,4nr</code> |
+| **Expected output** | `203.0.113.10      2 hits   25600 bytes` (first line, captured) |
+| **Equivalent** | `Group-Object` + `Measure-Object -Sum`; `Where-Object`; `'{0,-15}' -f` |
+| **Common errors** | Program in double quotes (shell expands `$1`) · header row compared as text (`NR > 1`) · `$NF` for a user agent with spaces (use `-F'"'`) · unsorted `for (k in a)` output · gawk-only functions under mawk |
+| **Use case** | Access-log analysis, `/etc/passwd` audits, CSV thresholds (Lab 24). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/awk.1p.html> · <https://manpages.ubuntu.com/manpages/noble/man1/mawk.1.html> · <https://www.gnu.org/software/gawk/manual/gawk.html> |
+
+### jq
+
+| Field | Detail |
+|---|---|
+| **OS** | `jq` 1.7 (`sudo apt install jq`) |
+| **Description** | Filters, reshapes and builds JSON; formats rows as CSV/TSV. |
+| **Syntax** | `jq [-r] [-c] [-s] [-n] [-e] [--arg N V] [--argjson N JSON] [--slurpfile N FILE] FILTER [FILE…]` |
+| **Parameters** | `.k`, `.[]`, `select()`, `map()`, `group_by()`, `length`, `add`, `//` default, `@csv`/`@tsv`, `"\(.x)"` interpolation · `-r` raw · `-s` slurp · `-e` status from result |
+| **Example** | <code>jq -r '.[] &#124; select(.severity == "critical") &#124; "\(.host) \(.check) \(.value)%"' alerts.json</code> |
+| **Expected output** | `web-02 disk 93%` · `file-01 disk 97%` (captured) |
+| **Equivalent** | `ConvertFrom-Json` + `Where-Object`; `ConvertTo-Json -Depth N` |
+| **Common errors** | `.host` on an array (needs `.[]`) · `--arg` passes strings (use `--argjson` for numbers) · building JSON with `echo` (quoting bugs) · invalid input (exit 5) |
+| **Use case** | API responses, `ip -j`, `journalctl -o json`, findings files (Lab 24). |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/jq.1.html> · <https://jqlang.org/manual/> |

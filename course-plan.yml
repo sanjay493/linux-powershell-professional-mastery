@@ -64,8 +64,8 @@ days:
      extras: ["docs/assessments/module-4-test.md", "pdf: Cybersecurity-Command-Reference.pdf"]}
   - {day: 21, module: module-5, release: 2026-11-17, status: published, title: "Variables and User Input"}
   - {day: 22, module: module-5, release: 2026-11-17, status: published, title: "Conditions and Loops"}
-  - {day: 23, module: module-5, release: 2026-11-18, status: planned, title: "Functions and Reusable Scripts"}
-  - {day: 24, module: module-5, release: 2026-11-18, status: planned, title: "Text and Data Processing"}
+  - {day: 23, module: module-5, release: 2026-11-18, status: published, title: "Functions and Reusable Scripts"}
+  - {day: 24, module: module-5, release: 2026-11-18, status: published, title: "Text and Data Processing"}
   - {day: 25, module: module-5, release: 2026-11-19, status: planned, title: "Task Scheduling and Automation",
      extras: ["scripts/linux/system-health.sh", "scripts/powershell/System-Health.ps1",
               "docs/assessments/module-5-test.md"]}

@@ -514,3 +514,46 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Parallel loop | `cmd &` … `wait` · `xargs -P` | `ForEach-Object -Parallel -ThrottleLimit N` (7.0+) | |
 | Time limit | `timeout 30 cmd` (exit 124) | `Wait-Job -Timeout 30` | |
 | Pause | `sleep 2` | `Start-Sleep -Seconds 2` | |
+
+## Scripting: functions and reusable scripts
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| Define a function | `f() { …; }` | `function Verb-Noun { param() … }` | Approved verbs (`Get-Verb`) |
+| Arguments | `$1` · `"$@"` · `$#` | named parameters · `$PSBoundParameters` | ⚠ no `$1` in PS |
+| Private variables | `local x` | default (local) · `$script:x` to share | ⚠ opposite defaults |
+| Return data | print on stdout; `v=$(f)` | output objects; `$v = f` | stray output pollutes both |
+| Success / failure | `return 0..255` | errors (`throw`, `Write-Error`) | `return 300` → 44 in Bash |
+| Diagnostics | `printf … >&2` | `Write-Verbose` · `Write-Warning` · `Write-Information` | |
+| Options | `while getopts ':hf:' o` | `param([Parameter(Mandatory)] …)` | PS validates and completes |
+| Validation | `[[ $v =~ ^[0-9]+$ ]]` · `(( v >= 1 ))` | `[ValidateRange()]` · `[ValidatePattern()]` · `[ValidateSet()]` | |
+| Help | `usage()` for `-h` | comment-based help → `Get-Help` | |
+| Dry run | custom `-n` option | `SupportsShouldProcess` → `-WhatIf` / `-Confirm` | |
+| Cleanup | `trap cleanup EXIT` | `try {} finally {}` · `clean {}` (7.3+) | ⚠ nothing survives `kill -9` |
+| Temp file | `mktemp` · `mktemp -d` | `New-TemporaryFile` · `[IO.Path]::GetTempPath()` | |
+| Catch an error | <code>cmd &#124;&#124; die "…"</code> · `trap … ERR` | `try { … -ErrorAction Stop } catch { }` | ⚠ `catch` ignores non-terminating errors |
+| Shared code | `source lib.sh` (+ load guard) | `Import-Module .\Mod` (`.psm1` + `.psd1`) | |
+| Testable script | `[[ ${BASH_SOURCE[0]} == "$0" ]] && main "$@"` | functions in a module; Pester tests | |
+| Pipeline input | `while read -r l; do …; done` | `process { }` + `ValueFromPipeline*` | |
+| One instance only | `flock -n 9` | named mutex / scheduled-task setting | Day 25 |
+
+## Text and data processing
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| Field of a line | `awk '{print $1}'` · `cut -d: -f1` | `($l -split '\s+')[0]` | ⚠ PS index from 0 |
+| Count per value | <code>sort &#124; uniq -c &#124; sort -rn</code> | <code>Group-Object -NoElement &#124; Sort-Object Count -Descending</code> | |
+| Numeric sort by column | `sort -t, -k5,5nr` | `Sort-Object { [int]$_.disk_pct } -Descending` | ⚠ text sort: `10 100 9` |
+| Sum / average | `awk '{s += $10} END {print s, s/NR}'` | `Measure-Object Bytes -Sum -Average` | |
+| Per-key sum | `awk '{b[$1] += $10} END {…}'` | `Group-Object IP` + `Measure-Object -Sum` | |
+| Replace | `sed -E 's/re/\1x/g'` | `-replace 're', '${1}x'` | ⚠ PS case-insensitive |
+| Print / delete lines | `sed -n '10,20p'` · `sed '/^#/d'` | `(Get-Content f)[9..19]` · `Where-Object { $_ -notmatch '^#' }` | |
+| Safe in-place edit | `sed … f` preview with `diff`, then `sed -i.bak` | `Copy-Item f f.bak`; `(Get-Content f) -replace …` then `Set-Content` | read fully before writing |
+| Strip CR | `tr -d '\r'` | <code>-replace "&#96;r", ''</code> | `Import-Csv` copes with CRLF |
+| CSV with quotes | Python `csv` / `gawk --csv` | `Import-Csv` | ⚠ `cut`/`awk -F,` split quoted commas |
+| CSV out | `printf '%s,%s\n'` | `Export-Csv -NoTypeInformation -Encoding UTF8` | ⚠ 5.1 defaults: `#TYPE`, ASCII |
+| JSON filter | <code>jq '.[] &#124; select(.v &gt;= 90)'</code> | <code>(… -Raw &#124; ConvertFrom-Json) &#124; Where-Object v -ge 90</code> | ⚠ 5.1 arrays: parentheses |
+| JSON out | `jq -n --arg h "$h" '{host: $h}'` | `ConvertTo-Json -Depth 5` | ⚠ default depth 2 |
+| Join two data sets | `join -t,` (sorted inputs) | hashtable lookup + calculated property | |
+| Lines → one line | `paste -sd,` | `-join ','` · `Join-String` (7.0+) | |
+| HTML report | — | `ConvertTo-Html` | |

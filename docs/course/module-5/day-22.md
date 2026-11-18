@@ -1322,4 +1322,4 @@ do { } until ($ok -or $attempt -ge $max)
 
 ---
 
-**Previous:** [Day 21: Variables and User Input](day-21.md) · **Next:** Day 23: Functions and Reusable Scripts (see the [release schedule](../schedule.md))
+**Previous:** [Day 21: Variables and User Input](day-21.md) · **Next:** [Day 23: Functions and Reusable Scripts](day-23.md)

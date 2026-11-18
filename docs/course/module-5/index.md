@@ -21,8 +21,8 @@ You will turn commands into robust, reusable scripts: variables and input, decis
 |---|---|---|---|
 | 21 | [Variables and User Input](day-21.md) | [Lab 21](../../labs/lab-21.md) | Published |
 | 22 | [Conditions and Loops](day-22.md) | [Lab 22](../../labs/lab-22.md) | Published |
-| 23 | Functions and Reusable Scripts | Lab 23 | 2026-11-18 22:00 IST |
-| 24 | Text and Data Processing | Lab 24 | 2026-11-18 22:00 IST |
+| 23 | [Functions and Reusable Scripts](day-23.md) | [Lab 23](../../labs/lab-23.md) | Published |
+| 24 | [Text and Data Processing](day-24.md) | [Lab 24](../../labs/lab-24.md) | Published |
 | 25 | Task Scheduling and Automation | Lab 25 | 2026-11-19 22:00 IST |
 
 **Module test:** released with Day 25 in [Assessments](../../assessments/index.md).

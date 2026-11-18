@@ -166,6 +166,8 @@ nav:
           # >>> DAYS module-5
           - "Day 21: Variables & User Input": course/module-5/day-21.md
           - "Day 22: Conditions & Loops": course/module-5/day-22.md
+          - "Day 23: Functions & Reusable Scripts": course/module-5/day-23.md
+          - "Day 24: Text & Data Processing": course/module-5/day-24.md
           # <<< DAYS module-5
       - "Module 6: Professional Operations & Projects":
           - course/module-6/index.md
@@ -201,6 +203,8 @@ nav:
       - "Lab 20: Suspicious Host Investigation": labs/lab-20.md
       - "Lab 21: Change Ticket Intake": labs/lab-21.md
       - "Lab 22: Triage Loop": labs/lab-22.md
+      - "Lab 23: Ops Toolkit": labs/lab-23.md
+      - "Lab 24: Access Log Report": labs/lab-24.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md
