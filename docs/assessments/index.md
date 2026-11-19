@@ -34,6 +34,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 22 | [Conditions and Loops](../course/module-5/day-22.md#quiz) |
 | 23 | [Functions and Reusable Scripts](../course/module-5/day-23.md#quiz) |
 | 24 | [Text and Data Processing](../course/module-5/day-24.md#quiz) |
+| 25 | [Task Scheduling and Automation](../course/module-5/day-25.md#quiz) |
+| 26 | [Remote Administration](../course/module-6/day-26.md#quiz) |
 
 ## Module tests
 
@@ -45,7 +47,7 @@ Each module test (20–25 questions: multiple choice, command-writing and a shor
 | [Module 2 test](module-2-test.md) | Days 6–10 | Available |
 | [Module 3 test](module-3-test.md) | Days 11–15 | Available |
 | [Module 4 test](module-4-test.md) | Days 16–20 | Available |
-| Module 5 test | Days 21–25 | 2026-11-19 22:00 IST |
+| [Module 5 test](module-5-test.md) | Days 21–25 | Available |
 | Module 6 test | Days 26–30 | 2026-11-21 22:00 IST |
 
 ## Final examination

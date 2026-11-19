@@ -30,7 +30,7 @@ Scripts live in the repository under `scripts/linux/` and `scripts/powershell/`.
 | 6 | `network-diagnostic.sh` | `Network-Diagnostic.ps1` | Layered connectivity diagnosis | **Day 15 (available)** |
 | 7 | `log-analyser.sh` | `Log-Analyser.ps1` | Error/warning summaries from system logs | **Day 16 (available)** |
 | 8 | `failed-login-report.sh` | `Failed-Login-Report.ps1` | Failed authentication summary by account and source | **Day 17 (available)** |
-| 9 | `system-health.sh` | `System-Health.ps1` | Thresholded health check for scheduling | Day 25 |
+| 9 | `system-health.sh` | `System-Health.ps1` | Thresholded health check for scheduling | **Day 25 (available)** |
 | 10 | `daily-report.sh` | `Daily-Report.ps1` | Combined daily text and CSV report | Day 29 |
 
 ---
@@ -1108,4 +1108,144 @@ Status                      : ALERT
 | Check | Linux script | PowerShell script |
 |---|---|---|
 | Executed | 2026-11-15 in an Ubuntu 24.04.5 container (Bash 5.2.21, journald and rsyslog started by hand): no arguments (journal source with real sshd logins of throwaway `lab17-*` users, exit 3 because of a success after failure), `-o`, `-f csv`, RFC 3339 and classic-format test files, a `.gz` copy, `-s 1` excluding old lines, `-t 3` and `-t 100`, run as `nobody` (no readable source: `n/a`, exit 0; readable `-l` file: non-root note), invalid `-s`, `-t`, option and `-l` path (exit 1), unwritable `-o` (exit 2). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (installing PowerShell was not permitted on the release host). `Get-WinEvent -FilterHashtable` keys, the `NoMatchingEventsFound` error, 4625/4624/4740 `EventData` names (`TargetUserName`, `TargetDomainName`, `IpAddress`, `LogonType`, `Status`, `SubStatus`, `AuthenticationPackageName`) and the NTSTATUS codes reviewed from knowledge of the official documentation. CI parses it, runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (no arguments and `-OutputPath`) and runs PSScriptAnalyzer |
+| Static analysis | `bash -n` and ShellCheck 0.9.0 (no findings at any severity, `-S style`) | PSScriptAnalyzer in CI (Error and Warning severities) |
+
+## system-health.sh / System-Health.ps1
+
+**Purpose:** a read-only, thresholded health check that is **designed to be scheduled**. One run checks CPU load, memory, swap (page file), every real filesystem's space (and, on Linux, inodes), the services you name, failed systemd units (Linux), pending reboot and uptime. Every check is `OK`, `WARNING` (threshold reached) or `n/a` (cannot be measured here — for example systemd checks in a container without systemd). Any `WARNING` makes the overall status `WARNING` and the exit code **3**, which is what cron, a systemd timer, Task Scheduler or a monitoring agent alerts on; with `-q` / `-Quiet` the script prints **nothing** when everything is OK, so cron only sends mail when something needs attention. Taught in [Day 25](../course/module-5/day-25.md) and scheduled in [Lab 25](../labs/lab-25.md).
+
+**How each value is measured.** Linux: CPU = 1-minute load average ÷ `nproc` × 100 (100% = one runnable task per CPU, so values above 100% are possible; the 5- and 15-minute averages are shown for trend); memory = (`MemTotal` − `MemAvailable`) ÷ `MemTotal` from `/proc/meminfo`, which does not count reclaimable cache as used; swap = (`SwapTotal` − `SwapFree`) ÷ `SwapTotal`; filesystems from `df --output` with the same pseudo-filesystem exclusions as `disk-monitor.sh`, and the `-d` threshold applied to both space and inode use; services with `systemctl is-active`; failed units with `systemctl --failed --no-legend --plain`; reboot required = `/var/run/reboot-required` exists (Debian/Ubuntu; the packages that asked for it are read from `/var/run/reboot-required.pkgs`). Windows: CPU = average `Win32_Processor.LoadPercentage`; memory = (`TotalVisibleMemorySize` − `FreePhysicalMemory`) ÷ `TotalVisibleMemorySize` from `Win32_OperatingSystem`; page file = `CurrentUsage` ÷ `AllocatedBaseSize` from `Win32_PageFileUsage`; every ready **Fixed** drive from `System.IO.DriveInfo`; `-Service` names with `Get-Service` (not found or not `Running` = `WARNING`); pending reboot = the `Component Based Servicing\RebootPending` key, the `WindowsUpdate\Auto Update\RebootRequired` key or a `PendingFileRenameOperations` value under `Session Manager`; uptime from `LastBootUpTime`. Uptime is information only and never raises a warning.
+
+### Prerequisites
+
+| Linux | Windows |
+|---|---|
+| Ubuntu 24.04 (any Linux with `/proc`), Bash 4+, GNU coreutils 8.21+ (`df --output`, `nproc`, `date`), `awk`. No root needed. `systemctl` is optional: when systemd is not PID 1 (containers, WSL without systemd) — detected the way `sd_booted(3)` does, by the absence of `/run/systemd/system` — the `-s` units and the failed-units check show `n/a`. `/var/run/reboot-required` is created by Ubuntu's update hooks (`update-notifier-common`); other distributions show `no`. | Windows 11 / Windows Server, Windows PowerShell 5.1 or PowerShell 7. No admin: CIM classes, `Get-Service` and the three registry locations are readable by standard users. Also runs in PowerShell 7 on Linux, where it reads `/proc/loadavg`, `/proc/meminfo`, `DriveInfo` mounts, `systemctl is-active` and `/var/run/reboot-required` (no inode check). |
+
+### Options
+
+| Bash | PowerShell | Default | Meaning |
+|---|---|---|---|
+| `-c CPU_PCT` | `-CpuPercent` | 90 | CPU warning threshold (1–1000): load per CPU % on Linux, `LoadPercentage` on Windows |
+| `-m MEM_PCT` | `-MemoryPercent` | 90 | Memory **and** swap / page file used % (1–100) |
+| `-d DISK_PCT` | `-DiskPercent` | 90 | Filesystem / drive used % (1–100); on Linux also inode use % |
+| `-s UNIT[,UNIT...]` | `-Service NAME[,NAME...]` | — | Units that must be `active` / services that must be `Running` (Windows names accept wildcards) |
+| <code>-f text&#124;csv</code> | <code>-Format Text&#124;Csv&#124;Json</code> | text | Output format; CSV columns `Check,Item,Value,Threshold,Status` |
+| `-o DIR` | `-OutputPath DIR` | — | Also save `system-health-<host>-<UTC>.<ext>` / `System-Health-<COMPUTER>-<UTC>.<ext>`; written on **every** run, also when `-q` prints nothing |
+| `-q` | `-Quiet` | off | Print nothing when the status is OK (the "Report saved to" note is suppressed too) |
+| `-h` | `Get-Help .\System-Health.ps1 -Full` | — | Help |
+
+Exit codes: `0` OK (`n/a` checks do not count as problems) · `1` invalid arguments (out-of-range threshold, unknown format or option, invalid unit name) · `2` output folder cannot be created or written · `3` at least one check is `WARNING`.
+
+### How to run
+
+```bash
+cd scripts/linux
+bash system-health.sh                               # all checks, default thresholds (90%)
+bash system-health.sh -c 80 -m 85 -d 80 -s ssh,cron # stricter thresholds + two units that must be active
+bash system-health.sh -f csv -o ~/lpm-lab/health    # CSV to the terminal and a timestamped file
+bash system-health.sh -q; echo "exit: $?"           # silent when OK; 3 = at least one WARNING
+# crontab -e (back up first: crontab -l > ~/crontab.bak): every 15 minutes, one instance at a time,
+# mail only when something is wrong, keep every report
+*/15 * * * * /usr/bin/flock -n /tmp/system-health.lock /home/student/lpm/scripts/linux/system-health.sh -q -s ssh,cron -o /home/student/lpm-lab/health
+```
+
+```powershell
+Set-Location scripts\powershell
+.\System-Health.ps1
+.\System-Health.ps1 -DiskPercent 80 -Service Spooler, W32Time
+.\System-Health.ps1 -Format Json -OutputPath $HOME\lpm-lab\health
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\System-Health.ps1 -Quiet; "exit: $LASTEXITCODE"
+# Every 15 minutes as the current user (run once in PowerShell; adjust the paths):
+Register-ScheduledTask -TaskName 'LPM System Health' -Trigger (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 15)) -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File C:\lpm\scripts\powershell\System-Health.ps1 -Quiet -Service Spooler,W32Time -OutputPath C:\lpm-lab\health')
+(Get-ScheduledTaskInfo -TaskName 'LPM System Health').LastTaskResult   # 0 = OK, 3 = WARNING
+```
+
+Under `powershell.exe -File` (and therefore in Task Scheduler) a list such as `-Service Spooler,W32Time` arrives as **one** string; the script splits it on commas, so both forms work.
+
+### Sample output (Bash; captured on 2026-11-19 in an Ubuntu 24.04.5 container without systemd as PID 1, with a temporary `/var/run/reboot-required` file; host renamed, two container-specific mount points and the PID 1 name replaced by generic names)
+
+```text
+==============================================
+ System Health Report
+==============================================
+Report time (UTC)    : 2026-11-19T16:46:02Z
+Host name            : ubuntu-lab
+Thresholds           : CPU >= 90%, memory/swap >= 90%, disk/inodes >= 90%
+systemd              : not booted with systemd (PID 1 is sandbox-init)
+Checks               : 8 OK, 2 WARNING, 4 n/a
+Status               : WARNING
+
+--- Checks ---
+CHECK         STATUS   VALUE       THRESHOLD ITEM
+cpu           OK       4.8%        >= 90%    load 1/5/15 min 0.19 0.10 0.03 on 4 CPU(s)
+memory        OK       3.6%        >= 90%    used of 15.7 GiB (MemTotal - MemAvailable)
+swap          n/a      n/a         >= 90%    no swap configured
+disk          OK       24%         >= 90%    / (ext4)
+inodes        OK       2%          >= 90%    / (ext4)
+disk          WARNING  93%         >= 90%    /opt/tools (ext4)
+inodes        OK       1%          >= 90%    /opt/tools (ext4)
+disk          OK       68%         >= 90%    /opt/runner (ext4)
+inodes        OK       1%          >= 90%    /opt/runner (ext4)
+service       n/a      n/a         active    ssh
+service       n/a      n/a         active    cron
+failed-units  n/a      n/a         0         systemctl --failed (systemd not running)
+reboot        WARNING  yes         no        /var/run/reboot-required (packages: linux-base, linux-image-6.8.0-88-generic)
+uptime        OK       0d 00h 07m  -         booted 2026-11-19T16:38:32Z
+
+--- Warnings ---
+disk          /opt/tools (ext4): 93% (threshold >= 90%)
+reboot        /var/run/reboot-required (packages: linux-base, linux-image-6.8.0-88-generic): yes (expected no)
+```
+
+The command was `system-health.sh -s ssh,cron` and the exit code was `3`. The two `service` rows and `failed-units` are `n/a` because the container has no systemd — on an Ubuntu VM they show `active`/`inactive` and a count. After the test file was removed, `system-health.sh -s ssh,cron -d 95 -f csv` printed the same checks as CSV (`disk,"/opt/tools (ext4)","93%",">= 95%",OK` …), every row `OK` or `n/a`, and exited `0`; `system-health.sh -q -d 95` printed nothing and exited `0`.
+
+### Sample output (PowerShell; **example** of the layout on Windows — illustrative values, not captured on Windows)
+
+```text
+==============================================
+ System Health Report
+==============================================
+Report time (UTC)    : 2026-11-19T17:02:41Z
+Computer name        : WIN11-LAB
+Thresholds           : CPU >= 90%, memory/page file >= 90%, disk >= 90%
+Checks               : 7 OK, 1 WARNING, 0 n/a
+Status               : WARNING
+PowerShell           : 5.1.26100.9168 (Desktop)
+
+--- Checks ---
+CHECK         STATUS   VALUE       THRESHOLD ITEM
+cpu           OK       7%          >= 90%    average LoadPercentage of 1 processor(s), 8 logical CPU(s)
+memory        OK       61.4%       >= 90%    used of 15.7 GiB
+swap          OK       4.2%        >= 90%    page file C:\pagefile.sys (2432 MB)
+disk          OK       68.7%       >= 90%    C:\ (NTFS, 236.5 GiB)
+service       OK       Running     Running   Spooler (Print Spooler)
+service       WARNING  Stopped     Running   W32Time (Windows Time)
+reboot        OK       no          no        CBS, Windows Update and Session Manager keys
+uptime        OK       2d 03h 18m  -         booted 2026-11-17T13:44:09Z
+
+--- Warnings ---
+service       W32Time (Windows Time): Stopped (expected Running)
+```
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `service` and `failed-units` rows show `n/a` | systemd is not PID 1 (container, WSL without `systemd=true` in `/etc/wsl.conf`); run on a VM, or ignore — `n/a` never changes the exit code |
+| `service … inactive` / `failed` / `unknown` | `systemctl status UNIT` and `journalctl -u UNIT -b`; check the unit name with `systemctl list-units --all 'name*'` |
+| `cpu` WARNING on a host that feels idle | Load counts tasks waiting for CPU **and** uninterruptible I/O (`D` state); compare the 5/15-minute values and run `process-monitor.sh` |
+| `memory` looks lower than `free` "used" suggests | The script uses `MemAvailable`, which treats reclaimable page cache as free — the figure the kernel recommends |
+| `reboot WARNING` right after updates | Expected: `/var/run/reboot-required` exists until you reboot; plan a maintenance window (`cat /var/run/reboot-required.pkgs` names the packages) |
+| `reboot … PendingFileRenameOperations` on Windows that never clears | Some installers and security products leave this value; confirm with the vendor, reboot once, and treat the two Windows Update/CBS keys as the authoritative signals |
+| The cron job never mails | Expected with `-q` when everything is OK; check `MAILTO`, an MTA, and the files in `-o DIR`; test with `-d 1` to force a warning |
+| Works by hand, fails in cron | cron has a minimal `PATH` and no profile: use absolute paths (as in the example line) and redirect `2>&1` to a log while testing |
+| Task Scheduler shows Last Run Result `0x3` | Expected: 3 means *WARNING*; open the latest report in `-OutputPath` |
+| `running scripts is disabled on this system` | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or the one-off `-ExecutionPolicy Bypass -File` form |
+
+### Validation status
+
+| Check | Linux script | PowerShell script |
+|---|---|---|
+| Executed | 2026-11-19 in an Ubuntu 24.04.5 container (Bash 5.2.21, GNU coreutils 9.4, systemd binaries installed but not PID 1): no arguments (exit 3: one filesystem at 93%), `-o`, `-f csv`, `-f csv -o`, `-q` with nothing to report (no output, exit 0, file still written with `-o`) and with a breach (full report, exit 3), `-d 1` and `-c 1 -m 1` (exit 3), `-s ssh,cron` (`n/a`), a temporary `/run/systemd/system` directory to exercise the systemd branch (`unknown` → WARNING), a temporary `/var/run/reboot-required` + `.pkgs` file (WARNING, exit 3; removed afterwards), invalid values, options, arguments and unit names (exit 1), uncreatable `-o` (exit 2), runs as `nobody` (no arguments: same results as root, exit 3; `-o` into a root-owned directory: exit 2; `-d 99 -o /tmp/…`: exit 0). CI: GitHub `ubuntu-24.04` runner, every release | **Not executed before release** (installing PowerShell was not permitted on the release host). Reviewed line by line for Windows PowerShell 5.1 syntax and `Set-StrictMode -Version Latest`; CIM properties (`LoadPercentage`, `TotalVisibleMemorySize`, `FreePhysicalMemory`, `LastBootUpTime`, `AllocatedBaseSize`, `CurrentUsage`) and the pending-reboot locations checked from knowledge of the official documentation. CI parses it, runs it on `windows-latest` with Windows PowerShell 5.1 and PowerShell 7 (`-OutputPath`) and runs PSScriptAnalyzer |
 | Static analysis | `bash -n` and ShellCheck 0.9.0 (no findings at any severity, `-S style`) | PSScriptAnalyzer in CI (Error and Warning severities) |

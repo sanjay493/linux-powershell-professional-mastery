@@ -168,10 +168,12 @@ nav:
           - "Day 22: Conditions & Loops": course/module-5/day-22.md
           - "Day 23: Functions & Reusable Scripts": course/module-5/day-23.md
           - "Day 24: Text & Data Processing": course/module-5/day-24.md
+          - "Day 25: Task Scheduling & Automation": course/module-5/day-25.md
           # <<< DAYS module-5
       - "Module 6: Professional Operations & Projects":
           - course/module-6/index.md
           # >>> DAYS module-6
+          - "Day 26: Remote Administration": course/module-6/day-26.md
           # <<< DAYS module-6
   - Command Reference:
       - reference/index.md
@@ -205,6 +207,8 @@ nav:
       - "Lab 22: Triage Loop": labs/lab-22.md
       - "Lab 23: Ops Toolkit": labs/lab-23.md
       - "Lab 24: Access Log Report": labs/lab-24.md
+      - "Lab 25: Scheduled Health Checks": labs/lab-25.md
+      - "Lab 26: Secure Remote Access": labs/lab-26.md
       # <<< LABS
   - Career Pathways:
       - careers/index.md
@@ -220,6 +224,7 @@ nav:
       - "Module 2 Test": assessments/module-2-test.md
       - "Module 3 Test": assessments/module-3-test.md
       - "Module 4 Test": assessments/module-4-test.md
+      - "Module 5 Test": assessments/module-5-test.md
   - Downloads:
       - downloads/index.md
   - About:

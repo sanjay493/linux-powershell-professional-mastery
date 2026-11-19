@@ -69,5 +69,5 @@ A searchable reference for every command taught in the course. Use the **search 
 | Scripting: variables, input, conditions & loops | :material-check: | :material-check: | Days 21–22 |
 | Scripting: functions, libraries & modules | :material-check: | :material-check: | Day 23 |
 | Text & data processing (sed, awk, sort, jq, CSV, JSON) | :material-check: | :material-check: | Day 24 |
-| Scheduling & automation | Day 25 | Day 25 | |
-| Remote administration | Day 26 | Day 26 | |
+| Scheduling & automation | :material-check: | :material-check: | Day 25 |
+| Remote administration | :material-check: | :material-check: | Day 26 |

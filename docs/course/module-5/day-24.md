@@ -1354,4 +1354,4 @@ $objs | ConvertTo-Html -Title 'Report' | Set-Content .\report.html
 
 ---
 
-**Previous:** [Day 23: Functions and Reusable Scripts](day-23.md) · **Next:** Day 25: Task Scheduling and Automation (see the [release schedule](../schedule.md))
+**Previous:** [Day 23: Functions and Reusable Scripts](day-23.md) · **Next:** [Day 25: Task Scheduling and Automation](day-25.md)

@@ -85,7 +85,7 @@ flowchart TD
 
 ### SSH on Ubuntu 24.04: service and socket
 
-Ubuntu 24.04 ships OpenSSH with **socket activation**: `ssh.socket` listens on port 22 and starts a per-connection `ssh.service` instance. Practically:
+Ubuntu 24.04 ships OpenSSH with **socket activation**: `ssh.socket` listens on port 22 and starts the (single) `ssh.service` on the first connection (`Accept=no`). Practically:
 
 - `systemctl status ssh` and `journalctl -u ssh` still show the server's logs.
 - To change the listening port on 24.04 you edit the **socket** (`systemctl edit ssh.socket`), not only `Port` in `sshd_config`. This catches many administrators out.

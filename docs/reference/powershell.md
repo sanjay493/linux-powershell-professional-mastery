@@ -2167,3 +2167,247 @@ Day 24 entries. All work in Windows PowerShell 5.1 and PowerShell 7 unless marke
 | **Common errors** | Writing HTML from formatted (`Format-Table`) output · using `Join-String` in 5.1 (use `-join`) |
 | **Use case** | E-mailable capacity and alert reports. |
 | **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/convertto-html> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/join-string> |
+
+## Scheduling & Automation
+
+### Register-ScheduledTask / New-ScheduledTaskAction / -Trigger / -Principal / -Settings
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only**; ScheduledTasks module (Windows 8 / Server 2012+); 5.1 and 7.x |
+| **Description** | Builds the four parts of a task (action, trigger, principal, settings) as objects and registers the task with Task Scheduler. |
+| **Syntax** | <code>Register-ScheduledTask [-TaskName] &lt;string&gt; [[-TaskPath] &lt;string&gt;] -Action &lt;obj[]&gt; [-Trigger &lt;obj[]&gt;] [-Principal &lt;obj&gt; &#124; -User &lt;string&gt; [-Password &lt;string&gt;]] [-Settings &lt;obj&gt;] [-Description &lt;string&gt;] [-Force]</code> |
+| **Parameters** | Action: `-Execute`, `-Argument`, `-WorkingDirectory` · Trigger: `-Daily -At`, `-Weekly -DaysOfWeek`, `-Once -At -RepetitionInterval -RepetitionDuration`, `-AtStartup`, `-AtLogOn`, `-RandomDelay` · Principal: `-UserId`, <code>-LogonType ServiceAccount&#124;Password&#124;S4U&#124;Interactive</code>, `-RunLevel Highest` · Settings: `-StartWhenAvailable`, `-ExecutionTimeLimit`, `-MultipleInstances IgnoreNew`, `-RestartCount`, `-RestartInterval`, `-AllowStartIfOnBatteries`, `-DontStopIfGoingOnBatteries` |
+| **Example** | `Register-ScheduledTask -TaskName 'Lab25-Health' -TaskPath '\Lab25\' -Action $action -Trigger $trigger -Principal $principal -Settings $settings` |
+| **Expected output** | `\Lab25\   Lab25-Health   Ready` (example) |
+| **Equivalent** | `crontab`; systemd `.timer` + `.service`; `schtasks /create` |
+| **Common errors** | `-Command` instead of `-File` in the action (exit code lost) · SYSTEM/`-RunLevel Highest` without an elevated session ("Access is denied") · `-RepetitionDuration ([TimeSpan]::MaxValue)` rejected on newer Windows · tasks not starting on battery (default) · SYSTEM task running a user-writable script |
+| **Use case** | Scheduled health checks, backups and reports on Windows (Lab 25). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/register-scheduledtask> · <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasktrigger> · <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/new-scheduledtasksettingsset> |
+
+### Get-ScheduledTask / Get-ScheduledTaskInfo
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only**; 5.1 and 7.x |
+| **Description** | `Get-ScheduledTask` returns task definitions (`Actions`, `Triggers`, `Principal`, `Settings`, `State`); `Get-ScheduledTaskInfo` returns run information: `LastRunTime`, `LastTaskResult`, `NextRunTime`, `NumberOfMissedRuns`. |
+| **Syntax** | `Get-ScheduledTask [[-TaskName] <string[]>] [[-TaskPath] <string[]>]` · `Get-ScheduledTaskInfo [-TaskName] <string> [[-TaskPath] <string>]` |
+| **Parameters** | `LastTaskResult`: `0` OK · your exit code (e.g. `3`) · `267009` (0x41301) running · `267011` (0x41303) not yet run · `267014` (0x41306) terminated · `0x80070002` file not found |
+| **Example** | <code>Get-ScheduledTaskInfo -TaskPath '\Lab25\' -TaskName 'Lab25-Health' &#124; Select-Object LastRunTime, LastTaskResult, NextRunTime</code> |
+| **Expected output** | `LastTaskResult : 3` after a threshold breach (example) |
+| **Equivalent** | `systemctl status NAME.service`, `systemctl list-timers`, `journalctl -u cron` |
+| **Common errors** | Reading 267011/267009 as failures · forgetting `-TaskPath` for tasks in folders · hidden tasks not listed without admin |
+| **Use case** | Checking that a task ran and what it returned; persistence hunting (<code>Where-Object TaskPath -notlike '\Microsoft\*'</code>). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/get-scheduledtask> · <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/get-scheduledtaskinfo> · <https://learn.microsoft.com/en-us/windows/win32/taskschd/task-scheduler-error-and-success-constants> |
+
+### Start- / Stop- / Enable- / Disable- / Unregister-ScheduledTask / Set-ScheduledTask
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only**; 5.1 and 7.x; admin rights for tasks you do not own |
+| **Description** | Run a task now, stop a running instance, switch a task on or off, delete it, or change its action, trigger, settings or principal. |
+| **Syntax** | `Start-ScheduledTask [-TaskName] <string> [[-TaskPath] <string>]` (same for Stop/Enable/Disable) · `Unregister-ScheduledTask … [-Confirm:$false]` · `Set-ScheduledTask [-TaskName] <string> [[-TaskPath] <string>] [-Action …] [-Trigger …] [-Settings …] [-Principal …]` |
+| **Parameters** | `-TaskPath '\Lab25\'` · `-Confirm:$false` (Unregister) · `-User`/`-Password` (Set, for stored-credential tasks) |
+| **Example** | `Set-ScheduledTask -TaskPath '\Lab25\' -TaskName 'Lab25-Health' -Action $alertAction; Start-ScheduledTask -TaskPath '\Lab25\' -TaskName 'Lab25-Health'` |
+| **Expected output** | `Set-ScheduledTask` returns the task (`\Lab25\ Lab25-Health Ready`); `Start-ScheduledTask` prints nothing (example) |
+| **Equivalent** | `systemctl start/stop/enable/disable`; commenting or deleting a crontab line |
+| **Common errors** | `Set-ScheduledTask` on a stored-password task without `-User`/`-Password` · `Unregister-ScheduledTask` without `-TaskPath` matching several tasks |
+| **Use case** | Testing a task immediately; maintenance windows; removing persistence after evidence is recorded. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/set-scheduledtask> · <https://learn.microsoft.com/en-us/powershell/module/scheduledtasks/unregister-scheduledtask> |
+
+### schtasks.exe
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only**; any shell (cmd, 5.1, 7.x); works against remote computers (`/s`) |
+| **Description** | Classic command-line tool to create, query, run, end, change and delete scheduled tasks. |
+| **Syntax** | `schtasks /create /tn NAME /tr CMD /sc SCHEDULE [/mo N] [/st HH:MM] [/ru USER] [/rl HIGHEST] [/f]` · <code>/query [/tn NAME] [/v] [/fo list&#124;csv]</code> · `/run /tn NAME` · `/end` · `/delete /tn NAME /f` |
+| **Parameters** | <code>/sc minute&#124;hourly&#124;daily&#124;weekly&#124;monthly&#124;once&#124;onstart&#124;onlogon</code> · `/mo` modifier · `/ru SYSTEM` · `/rl HIGHEST` · `/f` force |
+| **Example** | `schtasks /query /tn "\Lab25\Lab25-Health" /v /fo list` |
+| **Expected output** | `Last Result: 3` · `Next Run Time: 11/19/2026 5:15:00 PM` (example) |
+| **Equivalent** | `Register-ScheduledTask`, `Get-ScheduledTaskInfo`; `crontab -l` |
+| **Common errors** | `/tr` longer than 261 characters · quoting paths with spaces inside `/tr` · localised output when parsing (use `/fo csv`) |
+| **Use case** | Batch files, older systems, quick remote checks. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/schtasks> |
+
+### Task Scheduler operational log (Get-WinEvent)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows only**; 5.1 and 7.x; log `Microsoft-Windows-TaskScheduler/Operational` (often disabled by default) |
+| **Description** | Records task registration and every run: started, completed, action return code. Enabling it switches on a logging channel; it does not disable any security control. |
+| **Syntax** | `Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-TaskScheduler/Operational'; Id=…}` · `wevtutil gl <log>` · `wevtutil sl <log> /e:true` (admin) |
+| **Parameters** | IDs: 100 started · 101 start failed · 102 completed · 103 action start failed · 106 registered · 129 process created · 140 updated · 141 deleted · 200 action started · 201 action completed (return code) · 322 launch ignored, already running |
+| **Example** | `Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-TaskScheduler/Operational'; Id=201} -MaxEvents 5` |
+| **Expected output** | `… action "powershell.exe" with return code 3.` (example) |
+| **Equivalent** | `journalctl -u cron`, `journalctl -u NAME.service`, `grep CRON /var/log/syslog` |
+| **Common errors** | Log disabled ("No events were found") · filtering by message text in a localised Windows · confusing it with Security events 4698–4702 (task created/deleted/enabled/disabled/updated; need auditing) |
+| **Use case** | Proving when a task ran and what it returned; detecting new tasks (106) in a hunt. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/wevtutil> |
+
+### Register-ScheduledJob (legacy)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **Windows PowerShell 5.1 only** (module `PSScheduledJob`); not available in PowerShell 7 |
+| **Description** | Creates a PowerShell scheduled job (a task under `\Microsoft\Windows\PowerShell\ScheduledJobs\`) that runs a script block or file and stores its results as job objects. |
+| **Syntax** | <code>Register-ScheduledJob -Name &lt;string&gt; {-ScriptBlock &lt;sb&gt; &#124; -FilePath &lt;string&gt;} [-Trigger &lt;ScheduledJobTrigger[]&gt;] [-ScheduledJobOption &lt;obj&gt;]</code> |
+| **Parameters** | `New-JobTrigger -Daily -At 02:30` · `Get-ScheduledJob` · `Unregister-ScheduledJob` · results: `Import-Module PSScheduledJob; Get-Job; Receive-Job` |
+| **Example** | `Register-ScheduledJob -Name Lab25Legacy -FilePath C:\Lab25\bin\Lab25-Run-Health.ps1 -Trigger (New-JobTrigger -Daily -At 02:30)` |
+| **Expected output** | `Id Name JobTriggers Command Enabled` · `1 Lab25Legacy 1 C:\Lab25\bin\Lab25-Run-Health.ps1 True` (example) |
+| **Equivalent** | `Register-ScheduledTask` (preferred, 5.1 and 7) |
+| **Common errors** | Using it in PowerShell 7 ("not recognized") · expecting `LastTaskResult` to show the script's exit code |
+| **Use case** | Existing 5.1 automation only; migrate to `Register-ScheduledTask`. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/psscheduledjob/register-scheduledjob?view=powershell-5.1> |
+
+### Start-Transcript for job logs
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1 and 7.x (all platforms) |
+| **Description** | Records everything a session or script writes (output, errors, warnings, host messages) to a text file until `Stop-Transcript`. |
+| **Syntax** | `Start-Transcript [-Path] <string> [-Append] [-IncludeInvocationHeader]` · `Stop-Transcript` |
+| **Parameters** | `-Append` add to an existing file · `-IncludeInvocationHeader` time stamp per command · `-UseMinimalHeader` (7.2+) |
+| **Example** | `Start-Transcript -Path "C:\Lab25\log\transcript-$(Get-Date -Format yyyyMMdd).log" -Append; try { … } finally { Stop-Transcript }` |
+| **Expected output** | `Transcript started, output file is C:\Lab25\log\transcript-20261119.log` (example) |
+| **Equivalent** | `exec >> "$LOG" 2>&1` in Bash; `script` |
+| **Common errors** | No `Stop-Transcript` (file locked/incomplete) · transcripts capturing secrets · unbounded growth (rotate/delete) |
+| **Use case** | Debugging a scheduled task that "does nothing"; audit trail of automation runs. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.host/start-transcript> |
+
+## Remote Administration
+
+### Enable-PSRemoting / Disable-PSRemoting
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · **Windows only** · **elevated** · enabled by default on Windows Server, off on Windows client |
+| **Description** | Configures WinRM for remoting: starts the service (Automatic), creates an HTTP listener (5985), firewall exceptions, registers/enables session configurations (7.x adds `PowerShell.7`). `Disable-PSRemoting` only denies network access to the endpoints. |
+| **Syntax** | `Enable-PSRemoting [-Force] [-SkipNetworkProfileCheck]` · `Disable-PSRemoting [-Force]` |
+| **Parameters** | `-Force` no prompts · `-SkipNetworkProfileCheck` on a client with a Public network (public rule limited to the local subnet) |
+| **Example** | `Enable-PSRemoting -Force; Test-WSMan localhost` |
+| **Expected output** | `ProductVendor : Microsoft Corporation` · `ProductVersion : OS: 0.0.0 SP: 0.0 Stack: 3.0` (example) |
+| **Equivalent** | `sudo apt install openssh-server` (+ `ssh.socket`) |
+| **Common errors** | Fails on Public networks · assuming `Disable-PSRemoting` undoes everything (WinRM service, listener, firewall rules and `LocalAccountTokenFilterPolicy` remain) |
+| **Use case** | Preparing lab/client machines for remoting; full undo needs the extra clean-up steps. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/enable-psremoting> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/disable-psremoting> |
+
+### Test-WSMan
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · Windows |
+| **Description** | Checks whether the WinRM service answers on a computer (anonymous by default). |
+| **Syntax** | `Test-WSMan [[-ComputerName] <String>] [-UseSSL] [-Port <Int32>] [-Authentication <mech>] [-Credential <PSCredential>]` |
+| **Parameters** | `-UseSSL` test the 5986 HTTPS listener · `-Authentication Default/Kerberos/Negotiate` to test authenticated access |
+| **Example** | `Test-WSMan -ComputerName srv01` |
+| **Expected output** | `wsmid : http://schemas.dmtf.org/wbem/wsman/identity/1/wsmanidentity.xsd` … (example) |
+| **Equivalent** | `nc -vz host 22` / `ssh-keyscan host` |
+| **Common errors** | Success does not mean you may log in · firewall scope blocks remote subnets |
+| **Use case** | First step of every remoting troubleshooting session. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.wsman.management/test-wsman> |
+
+### Enter-PSSession / Exit-PSSession
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-HostName`/`-UserName`/`-KeyFilePath` (SSH) **7.x only** |
+| **Description** | Interactive 1:1 remote session; the prompt shows `[computer]: PS …>`. |
+| **Syntax** | `Enter-PSSession [-ComputerName] <String> [-Credential …] [-ConfigurationName …] [-UseSSL]` · `Enter-PSSession -HostName <String> [-UserName …] [-KeyFilePath …] [-Port …]` · `Exit-PSSession` |
+| **Parameters** | `-ConfigurationName PowerShell.7` (or a JEA endpoint) · `-Session $s` reuse a PSSession · aliases `etsn`, `exsn` |
+| **Example** | `Enter-PSSession -ComputerName localhost` |
+| **Expected output** | `[localhost]: PS C:\Users\student\Documents>` (example) |
+| **Equivalent** | `ssh host` |
+| **Common errors** | Access denied (not admin / not in Remote Management Users) · second-hop failures inside the session · using local variables (they do not exist remotely) |
+| **Use case** | Interactive troubleshooting on one server. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/enter-pssession> |
+
+### Invoke-Command
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-HostName` (SSH) **7.x only** |
+| **Description** | Runs a script block or script file on one or many computers in parallel; results are deserialized objects tagged with `PSComputerName`. |
+| **Syntax** | `Invoke-Command [-ComputerName] <String[]> [-ScriptBlock] <ScriptBlock> [-ArgumentList <Object[]>] [-ThrottleLimit <Int32>] [-AsJob] [-ErrorVariable <String>]` · `-Session <PSSession[]>` · `-FilePath <String>` |
+| **Parameters** | `-ThrottleLimit` (default **32**) · `$using:var` / `-ArgumentList` + `param()` to pass values · `-FilePath` sends a local script · `-AsJob` · `-HideComputerName` · `-ConfigurationName` |
+| **Example** | <code>Invoke-Command -ComputerName localhost { Get-Service -Name $using:svc } &#124; Select-Object PSComputerName, Name, Status</code> |
+| **Expected output** | `localhost WinRM Running` (example) |
+| **Equivalent** | `ssh -n -o BatchMode=yes "$h" 'cmd'` in a loop |
+| **Common errors** | Local variable without `$using:` (`$null` remotely) · calling methods on deserialized results · unreachable hosts only visible in the error stream · native exit codes not propagated |
+| **Use case** | Fleet checks and changes across Windows servers. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/invoke-command> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_remote_variables> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_remote_output> |
+
+### New-PSSession / Get-PSSession / Remove-PSSession
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | 5.1, 7.x · `-HostName` **7.x only** |
+| **Description** | Persistent remote runspaces: state (variables, modules) survives between `Invoke-Command -Session` calls. |
+| **Syntax** | <code>$s = New-PSSession [-ComputerName] &lt;String[]&gt; &#124; -HostName &lt;String[]&gt;</code> · `Get-PSSession` · `Remove-PSSession $s` |
+| **Parameters** | `-Credential` · `-ConfigurationName` · `-SessionOption (New-PSSessionOption -OpenTimeout …)` · aliases `nsn`, `gsn`, `rsn` |
+| **Example** | `$s = New-PSSession localhost; Invoke-Command $s { $a = 1 }; Invoke-Command $s { $a }` |
+| **Expected output** | `1` (example) |
+| **Equivalent** | SSH multiplexing (`ControlMaster`/`ControlPersist`) |
+| **Common errors** | Sessions left open (resource and audit noise) · session broken after network change |
+| **Use case** | Multi-step work on the same servers, file copy through sessions. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/new-pssession> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_pssessions> |
+
+### Copy-Item -ToSession / -FromSession
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **5.0+**, 7.x |
+| **Description** | Copies files and folders through an existing PSSession — no SMB share required. |
+| **Syntax** | `Copy-Item -Path <String> -Destination <String> -ToSession <PSSession>` · `Copy-Item -Path <remote> -Destination <local> -FromSession <PSSession>` |
+| **Parameters** | `-Recurse` folders · `-Force` |
+| **Example** | `Copy-Item .\report.txt -Destination C:\Temp\lab26\ -ToSession $s` |
+| **Expected output** | No output on success; `Get-FileHash` on both copies matches (example) |
+| **Equivalent** | `scp`, `sftp`, `rsync` |
+| **Common errors** | Destination folder missing · paths mixed up (remote path is interpreted on the remote side) |
+| **Use case** | Deploying scripts or collecting logs where only WinRM is allowed. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/copy-item> |
+
+### PowerShell 7 remoting over SSH
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **7.x only** (client and server), Windows/Linux/macOS; requires OpenSSH client and `sshd` with a PowerShell subsystem |
+| **Description** | Uses SSH as the remoting transport: key authentication and host-key checking from OpenSSH, cross-platform targets. |
+| **Syntax** | `Enter-PSSession -HostName host [-UserName u] [-KeyFilePath key] [-Port p]` · `Invoke-Command -HostName … -ScriptBlock {…}` · `New-PSSession -HostName …` |
+| **Parameters** | `-HostName` (also `user@host`) · `-UserName` · `-KeyFilePath` · `-Port` · `-SSHTransport` · `-Subsystem` (default `powershell`) · server: `Subsystem powershell /usr/bin/pwsh -sshs -nologo` (Linux) / `Subsystem powershell c:/progra~1/powershell/7/pwsh.exe -sshs -nologo` (Windows, 8.3 path) |
+| **Example** | `Invoke-Command -HostName ubuntu-lab -UserName lab26-ops -ScriptBlock { uname -r }` |
+| **Expected output** | `6.8.0-48-generic` (example) |
+| **Equivalent** | `ssh lab26-ops@ubuntu-lab 'uname -r'` |
+| **Common errors** | `subsystem request failed` (no Subsystem line / wrong pwsh path) · Windows PowerShell 5.1 has no `-HostName` · spaces in the Windows path |
+| **Use case** | Managing Linux and Windows with one PowerShell transport. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/scripting/security/remoting/ssh-remoting-in-powershell> |
+
+### WinRM configuration (TrustedHosts, winrm quickconfig)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows · `WSMan:` drive in 5.1 and 7.x (Windows) · elevated to change |
+| **Description** | WinRM client/service settings. TrustedHosts lists computers the client will send credentials to **without** being able to authenticate them (NTLM, workgroups, IPs). |
+| **Syntax** | `Get-Item WSMan:\localhost\Client\TrustedHosts` · `Set-Item WSMan:\localhost\Client\TrustedHosts -Value 'lab-vm01' [-Concatenate]` · `winrm quickconfig` · `winrm enumerate winrm/config/listener` · `winrm get winrm/config` |
+| **Parameters** | `Service\AllowUnencrypted` (keep `false`) · `Service\Auth\Basic` / `CredSSP` (keep `false`) · listeners HTTP 5985 / HTTPS 5986 |
+| **Example** | `(Get-Item WSMan:\localhost\Client\TrustedHosts).Value` |
+| **Expected output** | empty (example — the secure default) |
+| **Equivalent** | `known_hosts` (but that **does** verify the server) |
+| **Common errors** | `TrustedHosts = *` · Basic over HTTP · enabling CredSSP for the second hop |
+| **Use case** | Auditing and hardening WinRM; workgroup labs (prefer HTTPS or SSH). |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/scripting/security/remoting/winrm-security> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_remote_troubleshooting> |
+
+### Windows OpenSSH Server (Get-/Add-WindowsCapability, sshd service)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows 10 1809+ / Server 2019+ · elevated · capability cmdlets from the DISM module (Windows PowerShell; usable from 7 via Windows compatibility) |
+| **Description** | Installs and runs the OpenSSH server; config `C:\ProgramData\ssh\sshd_config`; administrators' keys in `C:\ProgramData\ssh\administrators_authorized_keys` (ACL: Administrators and SYSTEM only). |
+| **Syntax** | `Get-WindowsCapability -Online -Name OpenSSH*` · `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0` · `Start-Service sshd` · `Set-Service sshd -StartupType Automatic` |
+| **Parameters** | Firewall rule `OpenSSH-Server-In-TCP` · `icacls … /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F"` · `Remove-WindowsCapability` to uninstall |
+| **Example** | <code>Get-WindowsCapability -Online -Name OpenSSH* &#124; Select-Object Name, State</code> |
+| **Expected output** | `OpenSSH.Client~~~~0.0.1.0 Installed` · `OpenSSH.Server~~~~0.0.1.0 NotPresent` (example) |
+| **Equivalent** | `sudo apt install openssh-server` |
+| **Common errors** | Admin key placed in the profile instead of `administrators_authorized_keys` · wrong ACL · global settings appended after the `Match Group administrators` block |
+| **Use case** | SSH-based administration and PowerShell 7 SSH remoting to Windows. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse> · <https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement> |

@@ -19,7 +19,7 @@ You will administer systems remotely and securely, work through realistic networ
 
 | Day | Lesson | Lab | Status |
 |---|---|---|---|
-| 26 | Remote Administration | Lab 26 | 2026-11-19 22:00 IST |
+| 26 | [Remote Administration](day-26.md) | [Lab 26](../../labs/lab-26.md) | Published |
 | 27 | Network Investigation | Lab 27 | 2026-11-20 22:00 IST |
 | 28 | Advanced System Troubleshooting | Lab 28 | 2026-11-20 22:00 IST |
 | 29 | Integrated Diagnostic Automation | Lab 29 | 2026-11-21 22:00 IST |

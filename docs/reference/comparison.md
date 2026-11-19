@@ -557,3 +557,45 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Join two data sets | `join -t,` (sorted inputs) | hashtable lookup + calculated property | |
 | Lines → one line | `paste -sd,` | `-join ','` · `Join-String` (7.0+) | |
 | HTML report | — | `ConvertTo-Html` | |
+
+## Scheduling and automation
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| Recurring job | `crontab -e` → `*/15 * * * * /path/job` | `Register-ScheduledTask` + repeating trigger | ⚠ cron: absolute paths, `\%` |
+| Nightly 02:30 | `30 2 * * *` · `OnCalendar=*-*-* 02:30:00` | `New-ScheduledTaskTrigger -Daily -At 02:30` | prefer UTC servers |
+| At boot / logon | `@reboot` · `OnBootSec=` | `-AtStartup` · `-AtLogOn` | `@reboot` = cron start |
+| Run once later | `at 22:00` · `systemd-run --on-calendar=` | `-Once -At` · `schtasks /sc once` | |
+| Catch up missed runs | `anacron` · `Persistent=true` | `-StartWhenAvailable` | cron skips them |
+| No overlap | `flock -n LOCK CMD` | `-MultipleInstances IgnoreNew` | |
+| Time limit | `timeout 120 CMD` (exit 124) | `-ExecutionTimeLimit` | |
+| List jobs | `crontab -l` · `ls /etc/cron.d` · `systemctl list-timers --all` | `Get-ScheduledTask` | |
+| Last result | `journalctl -u cron` · `systemctl status NAME` | `Get-ScheduledTaskInfo` (`LastTaskResult`) | 0x41301 running, 0x41303 not run |
+| Run now | `systemctl start NAME.service` | `Start-ScheduledTask` · `schtasks /run` | |
+| Remove | delete the line · `crontab -i -r` | `Unregister-ScheduledTask -Confirm:$false` | ⚠ `crontab -r` = all |
+| Job history | `/var/log/syslog`, journal | TaskScheduler Operational log | enable it first |
+| Log from a job | `logger -t TAG -p user.warning` | `eventcreate` · `Write-EventLog` (5.1) | |
+| Rotate job logs | `logrotate` drop-in | script / clean-up task | |
+| Test a schedule | `systemd-analyze calendar 'EXPR'` | inspect the trigger object | |
+| Persistence hunt | <code>for u in $(cut -d: -f1 /etc/passwd); do crontab -l -u "$u"; done</code> | <code>Get-ScheduledTask &#124; Where-Object TaskPath -notlike '\Microsoft\*'</code> | T1053.003/.005/.006 |
+
+## Remote administration
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| Interactive remote shell | `ssh user@host` | `Enter-PSSession -ComputerName host` · `-HostName host` (7.x) | |
+| Command on one host | `ssh host 'cmd'` | `Invoke-Command -ComputerName host { cmd }` | ⚠ Bash double quotes expand locally |
+| Many hosts | `while read -r h; do ssh -n -o BatchMode=yes -o ConnectTimeout=5 "$h" 'cmd'; done < hosts` | `Invoke-Command -ComputerName $list -ThrottleLimit 32 -ErrorVariable bad` | ⚠ `-n` in loops; 255 = ssh error |
+| Pass a local value | `printf %q` / `ssh host 'bash -s' < script.sh` | `$using:var` · `-ArgumentList` | |
+| Persistent connection | `ControlMaster auto` + `ControlPersist` | `New-PSSession` + `-Session` | |
+| Copy a file | `scp -P 2222 f host:/tmp/` · `sftp -b batch host` | `Copy-Item f -Destination C:\Temp\ -ToSession $s` | ⚠ `scp -P` capital |
+| Sync a directory | `rsync -avzi --dry-run src/ host:dst/` | `robocopy src dst /MIR /L` | ⚠ `--delete` / `/MIR` delete files |
+| Tunnel to an internal port | `ssh -N -L 127.0.0.1:8443:192.0.2.20:443 bastion` | `ssh.exe -N -L …` | no WinRM equivalent |
+| Jump host | `ssh -J bastion target` · `ProxyJump` | SSH transport + `~/.ssh/config` | avoid agent forwarding |
+| Verify the server | known_hosts fingerprint · `ssh-keyscan` + `ssh-keygen -lf` | Kerberos · HTTPS certificate | ⚠ TrustedHosts is not authentication |
+| Create / install a key | `ssh-keygen -t ed25519 -a 100` · `ssh-copy-id` | `ssh-keygen.exe` · `administrators_authorized_keys` + `icacls` | |
+| Restrict a login | `authorized_keys` `from=`, `command=`, `restrict` | JEA (`RestrictedRemoteServer`, role capabilities) | |
+| Enable the server | `apt install openssh-server` | `Enable-PSRemoting` · `Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0` | |
+| Validate server config | `sudo sshd -t` · `sudo sshd -T` | `winrm get winrm/config` · `sshd.exe -t` | Ubuntu 24.04 Port: `ssh.socket` |
+| Who logged in (which key) | `journalctl _COMM=sshd -g 'Accepted publickey'` + `ssh-keygen -lf authorized_keys` | Security 4624 type 3 · WinRM/Operational 91 · PowerShell 4104 | |
+| Record a session | `script -q -a log -c 'ssh host'` | `Start-Transcript` | |

@@ -66,10 +66,10 @@ days:
   - {day: 22, module: module-5, release: 2026-11-17, status: published, title: "Conditions and Loops"}
   - {day: 23, module: module-5, release: 2026-11-18, status: published, title: "Functions and Reusable Scripts"}
   - {day: 24, module: module-5, release: 2026-11-18, status: published, title: "Text and Data Processing"}
-  - {day: 25, module: module-5, release: 2026-11-19, status: planned, title: "Task Scheduling and Automation",
+  - {day: 25, module: module-5, release: 2026-11-19, status: published, title: "Task Scheduling and Automation",
      extras: ["scripts/linux/system-health.sh", "scripts/powershell/System-Health.ps1",
               "docs/assessments/module-5-test.md"]}
-  - {day: 26, module: module-6, release: 2026-11-19, status: planned, title: "Remote Administration"}
+  - {day: 26, module: module-6, release: 2026-11-19, status: published, title: "Remote Administration"}
   - {day: 27, module: module-6, release: 2026-11-20, status: planned, title: "Network Investigation"}
   - {day: 28, module: module-6, release: 2026-11-20, status: planned, title: "Advanced System Troubleshooting"}
   - {day: 29, module: module-6, release: 2026-11-21, status: planned, title: "Integrated Diagnostic Automation",

@@ -23,6 +23,6 @@ You will turn commands into robust, reusable scripts: variables and input, decis
 | 22 | [Conditions and Loops](day-22.md) | [Lab 22](../../labs/lab-22.md) | Published |
 | 23 | [Functions and Reusable Scripts](day-23.md) | [Lab 23](../../labs/lab-23.md) | Published |
 | 24 | [Text and Data Processing](day-24.md) | [Lab 24](../../labs/lab-24.md) | Published |
-| 25 | Task Scheduling and Automation | Lab 25 | 2026-11-19 22:00 IST |
+| 25 | [Task Scheduling and Automation](day-25.md) | [Lab 25](../../labs/lab-25.md) | Published |
 
-**Module test:** released with Day 25 in [Assessments](../../assessments/index.md).
+**Module test:** [Module 5 test](../../assessments/module-5-test.md) (Days 21–25), listed in [Assessments](../../assessments/index.md).

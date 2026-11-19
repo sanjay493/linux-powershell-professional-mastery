@@ -2246,3 +2246,322 @@ Day 24 entries. All tools are part of a standard Ubuntu 24.04 installation excep
 | **Common errors** | `.host` on an array (needs `.[]`) · `--arg` passes strings (use `--argjson` for numbers) · building JSON with `echo` (quoting bugs) · invalid input (exit 5) |
 | **Use case** | API responses, `ip -j`, `journalctl -o json`, findings files (Lab 24). |
 | **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/jq.1.html> · <https://jqlang.org/manual/> |
+
+## Scheduling & Automation
+
+### crontab
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu/Debian: package `cron` (Debian fork of Vixie cron 3.0pl1), service `cron`, spool `/var/spool/cron/crontabs/` · RHEL: `cronie`, service `crond`, spool `/var/spool/cron/` |
+| **Description** | Installs, lists, edits and removes a user's crontab (the per-user list of recurring jobs run by the cron daemon). |
+| **Syntax** | <code>crontab [-u USER] { -e &#124; -l &#124; -r [-i] &#124; FILE &#124; - }</code> |
+| **Parameters** | `-e` edit · `-l` list · `-r` remove the **whole** crontab without asking · `-i` ask before `-r` · `FILE`/`-` install (replaces everything) · `-u USER` another user (root only) |
+| **Example** | `crontab -l > ~/crontab.bak && crontab -e` |
+| **Expected output** | `no crontab for student` (exit 1) when none exists (captured) |
+| **Equivalent** | `Register-ScheduledTask` / `Get-ScheduledTask` / `Unregister-ScheduledTask` |
+| **Common errors** | `crontab -r` typed for `-e` · editing the spool file directly · missing newline at EOF ("new crontab file is missing newline before EOF, can't install.") · user not allowed by `cron.allow`/`cron.deny` |
+| **Use case** | Recurring jobs for one user: health checks, reports, clean-up (Lab 25). |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/en/man1/crontab.1.html> |
+
+### cron syntax, /etc/crontab, /etc/cron.d and run-parts
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu 24.04 `cron` 3.0pl1; `/etc/cron.d` naming rules and `run-parts` are Debian/Ubuntu-specific; `CRON_TZ` only in cronie (RHEL) |
+| **Description** | Five time fields (minute, hour, day of month, month, day of week) and a command; system crontabs (`/etc/crontab`, `/etc/cron.d/*`) add a **user** field. `/etc/crontab` runs `run-parts` on `/etc/cron.hourly`, `cron.daily`, `cron.weekly`, `cron.monthly` (daily/weekly/monthly only when anacron is not installed). |
+| **Syntax** | `MIN HOUR DOM MON DOW COMMAND` · `MIN HOUR DOM MON DOW USER COMMAND` · `@reboot @hourly @daily @weekly @monthly @yearly` · `NAME=value` · `run-parts [--test] [--report] DIR` |
+| **Parameters** | `*` any · `a-b` range · `a,b` list · `*/n` step · names `jan`–`dec`, `sun`–`sat` · `\%` literal percent · `MAILTO=""` no mail · `SHELL=`, `PATH=` (not expanded) |
+| **Example** | `*/15 * * * * /home/student/lab25/bin/lab25-run-health.sh quick >> /home/student/lab25/log/cron-stderr.log 2>&1` · `run-parts --test /etc/cron.daily` |
+| **Expected output** | Syslog: `CRON[5587]: (student) CMD ([5588] /home/student/lab25/bin/lab25-run-health.sh quick …)` (captured) · `run-parts --test` lists only dot-less executable names (captured) |
+| **Equivalent** | `New-ScheduledTaskTrigger` (`-Daily`, `-Weekly`, repetition) |
+| **Common errors** | Day-of-month **and** day-of-week both restricted = OR · unescaped `%` cuts the command · file names with dots in `/etc/cron.d` or `cron.daily` are silently ignored · missing user field in `/etc/cron.d` · cron environment: `PATH=/usr/bin:/bin`, `SHELL=/bin/sh`, no profile · `TZ=` does not change scheduling · output discarded when no MTA ("No MTA installed, discarding output") |
+| **Use case** | System and package jobs; drop-in files managed by configuration management. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/en/man5/crontab.5.html> · <https://manpages.ubuntu.com/manpages/noble/en/man8/cron.8.html> · <https://manpages.ubuntu.com/manpages/noble/en/man8/run-parts.8.html> |
+
+### anacron
+
+| Field | Detail |
+|---|---|
+| **OS** | Ubuntu: package `anacron` (default on desktops, usually absent on servers); started at boot and hourly |
+| **Description** | Runs daily, weekly and monthly jobs that were missed while the machine was off, using time stamps in `/var/spool/anacron/`. |
+| **Syntax** | `/etc/anacrontab`: `PERIOD_DAYS DELAY_MIN JOB-ID COMMAND` · `anacron [-f] [-n] [-s] [-T] [JOB…]` |
+| **Parameters** | `-T` test anacrontab syntax · `-f` force (ignore time stamps) · `-n` no delay · `-s` serialise jobs · `@daily`/`@weekly`/`@monthly` periods |
+| **Example** | `sudo anacron -T && cat /etc/anacrontab` |
+| **Expected output** | No output and exit 0 when the anacrontab is valid (example) |
+| **Equivalent** | `New-ScheduledTaskSettingsSet -StartWhenAvailable`; systemd `Persistent=true` |
+| **Common errors** | Expecting minute/hour precision (granularity is days) · installing anacron and wondering why `/etc/crontab` no longer runs `cron.daily` (anacron does it) |
+| **Use case** | Laptops and desktops that are not running at 06:25. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/en/man8/anacron.8.html> |
+
+### systemd timers (.timer + .service)
+
+| Field | Detail |
+|---|---|
+| **OS** | systemd 255 (Ubuntu 24.04); any systemd distribution. User timers in `~/.config/systemd/user/` |
+| **Description** | A `.timer` unit activates a `.service` unit (normally `Type=oneshot`) on a calendar or monotonic schedule, with per-unit journal logs, status, dependencies and sandboxing. |
+| **Syntax** | `[Timer]` `OnCalendar=` · `OnBootSec=` · `OnUnitActiveSec=` · `Persistent=` · `RandomizedDelaySec=` · `AccuracySec=` · `Unit=` · `[Install] WantedBy=timers.target` |
+| **Parameters** | `OnCalendar=*:0/15`, `Mon..Fri 08:00`, `*-*-* 02:30:00 UTC` · `Persistent=true` catch up one missed run · `RandomizedDelaySec=15min` spread a fleet · `AccuracySec=` default 1min · service: `Type=oneshot`, `User=`, `TimeoutStartSec=`, `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ReadWritePaths=`, `PrivateTmp=yes` |
+| **Example** | `sudo systemctl daemon-reload && sudo systemctl enable --now lab25-health.timer` |
+| **Expected output** | `Created symlink /etc/systemd/system/timers.target.wants/lab25-health.timer → /etc/systemd/system/lab25-health.timer.` (example) |
+| **Equivalent** | `Register-ScheduledTask` with triggers and `New-ScheduledTaskSettingsSet` |
+| **Common errors** | Enabling the service instead of the timer · forgetting `daemon-reload` · `[Install]` in the oneshot service · user timers stop at logout (`loginctl enable-linger`) · exit 3 marks the service failed (use `SuccessExitStatus=3` only if intended) |
+| **Use case** | Important recurring jobs on servers: health checks, backups, log rotation (`logrotate.timer`). |
+| **Docs** | <https://man7.org/linux/man-pages/man5/systemd.timer.5.html> · <https://man7.org/linux/man-pages/man7/systemd.time.7.html> · <https://man7.org/linux/man-pages/man5/systemd.exec.5.html> |
+
+### systemctl list-timers / systemd-analyze calendar
+
+| Field | Detail |
+|---|---|
+| **OS** | systemd 255; `systemd-analyze calendar` and `verify` also work where systemd is not PID 1; `--base-time` needs systemd 254+ |
+| **Description** | `list-timers` shows each timer's next and last run and the unit it activates; `systemd-analyze calendar` normalises an `OnCalendar=` expression and prints the next elapses; `systemd-analyze verify` checks unit files. |
+| **Syntax** | `systemctl [--user] list-timers [--all] [PATTERN]` · `systemd-analyze calendar [--iterations=N] [--base-time=T] EXPR…` · `systemd-analyze verify FILE…` |
+| **Parameters** | `--all` include inactive timers · `--iterations=N` show N runs · `--base-time=` compute from another time (DST tests) |
+| **Example** | `systemd-analyze calendar --iterations=3 '*:0/15'` |
+| **Expected output** | `Normalized form: *-*-* *:00/15:00` · `Next elapse: Thu 2026-11-19 17:00:00 UTC` … (captured) |
+| **Equivalent** | `Get-ScheduledTaskInfo` (`NextRunTime`); inspecting a `New-ScheduledTaskTrigger` object |
+| **Common errors** | Quoting: put expressions in single quotes · cron OR vs systemd AND for weekday + day-of-month · local-time schedules at 02:30 skip DST spring-forward days |
+| **Use case** | Testing a schedule before enabling it; auditing all timers (persistence hunting). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/systemd-analyze.1.html> · <https://man7.org/linux/man-pages/man1/systemctl.1.html> |
+
+### systemd-run (transient timers)
+
+| Field | Detail |
+|---|---|
+| **OS** | systemd 255; needs a running systemd (PID 1) or user manager |
+| **Description** | Creates a transient service, optionally with a transient timer, without writing unit files; gone after it runs or after reboot. |
+| **Syntax** | <code>systemd-run [--user] [--unit=NAME] {--on-calendar=SPEC &#124; --on-active=TIME &#124; --on-boot=TIME} COMMAND [ARGS…]</code> |
+| **Parameters** | `--on-calendar=` calendar spec · `--on-active=` relative to now · `--unit=` name · `--user` your user manager · `-p`/`--property=` service settings · `--timer-property=` timer settings |
+| **Example** | `sudo systemd-run --on-calendar='*-*-* 03:00' --unit=lab25-once /usr/local/bin/report` |
+| **Expected output** | `Running timer as unit: lab25-once.timer` · `Will run service as unit: lab25-once.service` (example) |
+| **Equivalent** | `at`; `Register-ScheduledTask` with `-Once` |
+| **Common errors** | Expecting it to survive a reboot · missing `--user` for user-level jobs · relative paths |
+| **Use case** | One-off delayed jobs on systemd hosts; quick tests of a command under a service environment. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/systemd-run.1.html> |
+
+### at / atq / atrm / batch
+
+| Field | Detail |
+|---|---|
+| **OS** | Package `at` 3.2.5 (`sudo apt install at`), daemon `atd`; access via `/etc/at.allow`, `/etc/at.deny` |
+| **Description** | Queue a command to run **once** at a time (`at`) or when the load is low (`batch`); list (`atq`), show (`at -c`) and remove (`atrm`) jobs. The current environment and directory are saved into the job. |
+| **Syntax** | `at [-f FILE] TIME` · `batch` · `atq` · `at -c JOB` · `atrm JOB…` |
+| **Parameters** | Times: `now + 30 minutes`, `22:00`, `02:30 tomorrow`, `noon`, `midnight`, `teatime` · `-f` read commands from a file · `-q` queue letter |
+| **Example** | <code>echo '/usr/bin/true' &#124; at 02:30 tomorrow &amp;&amp; atq</code> |
+| **Expected output** | `job 2 at Fri Nov 20 02:30:00 2026` · `2  Fri Nov 20 02:30:00 2026 a student` (captured) |
+| **Equivalent** | `New-ScheduledTaskTrigger -Once -At …`; `schtasks /create /sc once` |
+| **Common errors** | `atd` not running · `now + 1 minute` rounds to the minute start · jobs use `/bin/sh` |
+| **Use case** | One-off reboot after a change; automatic rollback of a risky firewall change. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/en/man1/at.1.html> |
+
+### flock in scheduled jobs
+
+| Field | Detail |
+|---|---|
+| **OS** | util-linux 2.39 (all distributions) |
+| **Description** | Runs a command while holding an advisory lock on a file; with `-n` exits at once if the lock is held, so scheduled jobs never overlap. The lock is released automatically when the process ends. |
+| **Syntax** | <code>flock [-n &#124; -w SEC] [-E CODE] [-s &#124; -x] LOCKFILE COMMAND [ARGS…]</code> · `flock [-n] FD` |
+| **Parameters** | `-n` non-blocking · `-w SEC` wait at most SEC · `-E CODE` exit code when busy (default 1) · `-s` shared · `-x` exclusive (default) |
+| **Example** | <code>exec 9&gt; "$LOCK"; flock -n 9 &#124;&#124; { logger -t lab25 "previous run still active"; exit 0; }</code> |
+| **Expected output** | `flock -n status: 1` · `flock -n -E 75 status: 75` when busy (captured) |
+| **Equivalent** | `New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew`; `System.Threading.Mutex` |
+| **Common errors** | Lock file in a directory the job cannot write · "busy" and "command failed" both exit 1 without `-E` · using `[ -e lockfile ]` (stale locks after a crash) |
+| **Use case** | Every frequent cron job: backups, health checks, syncs. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/flock.1.html> |
+
+### logger / journalctl for job logs
+
+| Field | Detail |
+|---|---|
+| **OS** | `logger` (util-linux/bsdutils), `journalctl` (systemd); Ubuntu rsyslog writes cron messages to `/var/log/syslog` |
+| **Description** | `logger` writes a tagged message with a priority to syslog/the journal; `journalctl` reads cron's job log (`-u cron`), tagged messages (`-t`) and per-unit logs of timer services (`-u NAME.service`). |
+| **Syntax** | `logger [-t TAG] [-p FACILITY.LEVEL] [--] MESSAGE` · `journalctl -u cron` · `journalctl -t TAG [-p LEVEL]` · `journalctl -u NAME.service` |
+| **Parameters** | `-t` tag · `-p user.info`/`user.warning`/`user.err` · `journalctl --since`, `-n`, `-o cat` |
+| **Example** | `logger -t lab25 -p user.warning -- "mode=quick status=ALERT exit=3"` |
+| **Expected output** | `<12>Nov 19 16:50:09 lab25: mode=quick status=ALERT exit=3 …` as received by syslog (captured; `/var/log/syslog` adds time stamp and host) |
+| **Equivalent** | `eventcreate` / `Write-EventLog` (5.1); `Get-WinEvent` on the TaskScheduler Operational log |
+| **Common errors** | Expecting a separate `/var/log/cron.log` on Ubuntu (not enabled by default) · forgetting `--` before a message starting with `-` |
+| **Use case** | One line per job run in central logging; alerts on `warning`/`err`. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/logger.1.html> · <https://man7.org/linux/man-pages/man1/journalctl.1.html> |
+
+## Remote Administration
+
+### ssh
+
+| Field | Detail |
+|---|---|
+| **OS** | All Linux (openssh-client); OpenSSH 9.6p1 on Ubuntu 24.04; also `ssh.exe` on Windows 10 1809+ |
+| **Description** | Secure remote shell and remote command execution; carries file transfer (SFTP) and TCP tunnels over one authenticated, encrypted connection. |
+| **Syntax** | `ssh [-p PORT] [-i KEY] [-J JUMP] [-t] [-n] [-o Option=value]… [user@]host [command]` |
+| **Parameters** | `-p` port · `-i` identity file · `-J` jump host(s) · `-t` force TTY (sudo, top) · `-n` stdin from /dev/null · `-v` debug · `-o` any ssh_config keyword · `-G` print effective config · exit status = remote command's status, **255** = ssh error |
+| **Example** | `ssh lab26-srv 'echo $HOME $USER'` (single quotes: expanded remotely) |
+| **Expected output** | `/home/lab26-ops lab26-ops` (captured; with double quotes the local values `/home/student student` appear) |
+| **Equivalent** | `Enter-PSSession` / `Invoke-Command` (WinRM or `-HostName` SSH in PowerShell 7) |
+| **Common errors** | Double quotes expand locally · unquoted `~` expands locally · `-t` in scripts (`Pseudo-terminal will not be allocated…`) · treating 255 like a command failure |
+| **Use case** | Interactive administration, one-off remote commands, scripted checks. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ssh.1.html> |
+
+### ~/.ssh/config (ssh_config)
+
+| Field | Detail |
+|---|---|
+| **OS** | All OpenSSH clients; system file `/etc/ssh/ssh_config` + `ssh_config.d/*.conf` (Ubuntu sets `HashKnownHosts yes`) |
+| **Description** | Per-host client settings and aliases. For each keyword the **first obtained value wins**: specific `Host` blocks first, `Host *` defaults last. |
+| **Syntax** | `Host alias…` followed by indented `Keyword value` lines · `Include file` (near the top; relative to `~/.ssh`) |
+| **Parameters** | `HostName` · `User` · `Port` · `IdentityFile` · `IdentitiesOnly yes` (offer only listed keys) · `ProxyJump bastion` · `ConnectTimeout` · `BatchMode` · `StrictHostKeyChecking` · `ServerAliveInterval` · `ForwardAgent` (keep `no`) |
+| **Example** | <code>ssh -G lab26-srv-b &#124; grep -E '^(hostname&#124;port&#124;user&#124;proxyjump) '</code> |
+| **Expected output** | `user lab26-ops` · `hostname 127.0.0.1` · `port 2222` · `proxyjump lab26-srv` (captured) |
+| **Equivalent** | No WinRM equivalent (WSMan: drive / Group Policy); PowerShell 7 SSH remoting uses the same file |
+| **Common errors** | Wildcard block before specific blocks · `Include` at the end (overridden) · file group/world-writable (`Bad owner or permissions`) · `Too many authentication failures` without `IdentitiesOnly` |
+| **Use case** | Aliases for fleets, bastions with ProxyJump, per-host keys and legacy-algorithm exceptions. |
+| **Docs** | <https://man7.org/linux/man-pages/man5/ssh_config.5.html> |
+
+### ssh-keygen
+
+| Field | Detail |
+|---|---|
+| **OS** | All OpenSSH; default key type ed25519 since OpenSSH 9.5 |
+| **Description** | Creates key pairs, shows fingerprints, manages `known_hosts` entries and passphrases. |
+| **Syntax** | `ssh-keygen -t ed25519 [-a ROUNDS] [-C COMMENT] [-f FILE]` · `ssh-keygen -lf FILE` · `ssh-keygen -F HOST` · `ssh-keygen -R HOST` · `ssh-keygen -p -f KEY` |
+| **Parameters** | `-t ed25519` (or `rsa -b 4096` for legacy) · `-a 100` KDF rounds · `-C` comment (who/where/when) · `-f` file · `-N` passphrase · `-lf` fingerprint of each key in a file (pub key, `authorized_keys`, scan output) · `-F`/`-R` find/remove known host (`[host]:port`) · `-p` change passphrase · `-y` public from private |
+| **Example** | `ssh-keygen -lf /home/lab26-ops/.ssh/authorized_keys` |
+| **Expected output** | `256 SHA256:hPIt3wpF… contractor@old-laptop (ED25519)` · `256 SHA256:hIabfdxp… student@ubuntu-lab lab26 2026-11 (ED25519)` (captured) |
+| **Equivalent** | `ssh-keygen.exe` on Windows (same options) |
+| **Common errors** | No passphrase on personal keys · meaningless comments · `ssh-keygen -R` before verifying a changed host key · DSA keys (disabled) |
+| **Use case** | Key creation and rotation; mapping a log fingerprint to a person; auditing `authorized_keys`. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ssh-keygen.1.html> |
+
+### ssh-copy-id
+
+| Field | Detail |
+|---|---|
+| **OS** | Linux/macOS (openssh-client); not for Windows targets |
+| **Description** | Logs in (usually with a password) and appends your public key to the remote `~/.ssh/authorized_keys`, creating `~/.ssh` with safe modes if missing; skips keys that already work. |
+| **Syntax** | `ssh-copy-id [-i KEY.pub] [-p PORT] [-n] user@host` |
+| **Parameters** | `-i` key to install · `-p` port · `-n` dry run · `-f` force (skip the "already installed" check) |
+| **Example** | `ssh-copy-id -i ~/.ssh/lab26_ed25519.pub -p 2222 lab26-ops@127.0.0.1` |
+| **Expected output** | `Number of key(s) added: 1` (captured) |
+| **Equivalent** | Windows: append to `authorized_keys` or `C:\ProgramData\ssh\administrators_authorized_keys` + `icacls` |
+| **Common errors** | Does not fix wrong existing permissions (StrictModes still refuses) · installs into the wrong account · forgetting to disable passwords afterwards |
+| **Use case** | Bootstrapping key login on a new server. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ssh-copy-id.1.html> |
+
+### ssh-agent / ssh-add
+
+| Field | Detail |
+|---|---|
+| **OS** | All OpenSSH; on Windows the `ssh-agent` service (disabled by default, stores keys persistently) |
+| **Description** | Holds decrypted private keys in memory so the passphrase is typed once; `ssh` and `BatchMode` scripts use it. |
+| **Syntax** | `eval "$(ssh-agent -s)"` · `ssh-add [-t LIFE] [KEY]` · `ssh-add -l` · `ssh-add -D` · `ssh-agent -k` |
+| **Parameters** | `-t 1h` lifetime · `-l` list fingerprints · `-D` remove all · `-c` confirm each use · `ssh -A` / `ForwardAgent` forwards the agent (risky: root on the remote host can use it) |
+| **Example** | `ssh-add -t 1h ~/.ssh/lab26_ed25519 && ssh-add -l` |
+| **Expected output** | `Identity added: …/lab26_ed25519 (student@ubuntu-lab lab26 2026-11)` · `Lifetime set to 3600 seconds` · `256 SHA256:hIab… (ED25519)` (captured) |
+| **Equivalent** | Kerberos ticket cache for WinRM single sign-on |
+| **Common errors** | Agent forwarding to untrusted hosts (use `ProxyJump`) · no lifetime · cron jobs without an agent fail with passphrase keys |
+| **Use case** | Daily admin sessions with passphrase-protected keys. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ssh-agent.1.html> · <https://man7.org/linux/man-pages/man1/ssh-add.1.html> |
+
+### known_hosts / StrictHostKeyChecking / ssh-keyscan
+
+| Field | Detail |
+|---|---|
+| **OS** | All OpenSSH; `~/.ssh/known_hosts` hashed on Ubuntu (`HashKnownHosts yes`) |
+| **Description** | Server authentication: the client stores host keys on first use and refuses changed keys (`REMOTE HOST IDENTIFICATION HAS CHANGED`). `ssh-keyscan` fetches keys but verifies nothing. |
+| **Syntax** | `ssh-keyscan [-p PORT] [-t TYPE] host` · `ssh -o StrictHostKeyChecking=ask/accept-new/yes/no` |
+| **Parameters** | `ask` (default) · `accept-new` (add new, refuse changed — automation) · `yes` (pre-distributed keys only) · `no` (avoid) · `UserKnownHostsFile` · `@cert-authority` lines for host certificates |
+| **Example** | <code>ssh-keyscan -p 2222 -t ed25519 127.0.0.1 2&gt;/dev/null &gt; scan.txt; ssh-keygen -lf scan.txt</code> |
+| **Expected output** | `256 SHA256:o/qhZftx7JopY2TFsRNbav8tMFad0jgMi94N4HFHUNQ [127.0.0.1]:2222 (ED25519)` — compare with the out-of-band value (captured) |
+| **Equivalent** | Kerberos mutual authentication / HTTPS certificate for WinRM (TrustedHosts is **not** authentication) |
+| **Common errors** | Typing `yes` without checking · `StrictHostKeyChecking=no` in scripts · `ssh-keygen -R` as a reflex on a changed key |
+| **Use case** | First connections, rebuilt servers, automation known_hosts files. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ssh-keyscan.1.html> · <https://man7.org/linux/man-pages/man5/ssh_config.5.html> |
+
+### scp
+
+| Field | Detail |
+|---|---|
+| **OS** | All OpenSSH; uses the **SFTP protocol** by default since OpenSSH 9.0 |
+| **Description** | Copies files between hosts over SSH. |
+| **Syntax** | `scp [-P PORT] [-r] [-p] [-O] [-i KEY] SRC… DEST` (remote paths `host:path`) |
+| **Parameters** | `-P` port (**capital**) · `-r` recursive · `-p` preserve times/modes · `-O` legacy SCP protocol for old servers · `-J` jump host · `-v` shows `Sending subsystem: sftp` vs `Sending command: scp -t` |
+| **Example** | `scp files/report.txt lab26-srv:/tmp/ && scp lab26-srv:motd.txt files/` |
+| **Expected output** | No output on success (captured); `cat files/motd.txt` → `LAB26 server 2026-11-19` |
+| **Equivalent** | `Copy-Item -ToSession` / `-FromSession`; `scp.exe` on Windows |
+| **Common errors** | `-p 2222` instead of `-P 2222` · missing `:` (copies locally) · remote globs quoting with `-O` |
+| **Use case** | Quick one-off transfers. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/scp.1.html> |
+
+### sftp
+
+| Field | Detail |
+|---|---|
+| **OS** | All OpenSSH (server needs `Subsystem sftp`) |
+| **Description** | Interactive or batch file transfer over SSH (`put`, `get`, `ls`, `cd`, `mkdir`, `rm`, `chmod`). |
+| **Syntax** | `sftp [-P PORT] [-b BATCHFILE] [user@]host` |
+| **Parameters** | `-b file` batch mode — aborts with exit 1 on the first failing command (prefix a command with `-` to ignore its failure); needs non-interactive auth · `-P` port |
+| **Example** | `sftp -b sftp-bad.txt lab26-srv; echo "exit=$?"` (batch with `cd /nonexistent`) |
+| **Expected output** | `sftp> cd /nonexistent` · `stat remote: No such file or directory` · `exit=1` (captured) |
+| **Equivalent** | `Copy-Item -ToSession`; `sftp.exe` |
+| **Common errors** | Expecting batch mode to continue after an error · password prompts in batch mode |
+| **Use case** | Scripted uploads to SFTP-only accounts (`ForceCommand internal-sftp`). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/sftp.1.html> |
+
+### rsync (over SSH)
+
+| Field | Detail |
+|---|---|
+| **OS** | `rsync` package on **both** ends (3.2.7 on Ubuntu 24.04; `sudo apt install rsync`) |
+| **Description** | Incremental copy/sync; transfers only differences; uses SSH for `host:path`. |
+| **Syntax** | `rsync [-a] [-v] [-z] [-i] [-n] [--delete] [-e 'ssh OPTS'] SRC… [host:]DEST` |
+| **Parameters** | `-a` archive (recursive, perms, times, links) · `-v` · `-z` compress · `-i` itemize (`<f..t......`) · `-n`/`--dry-run` · `--delete` remove extra files at destination (**dry run first**) · trailing slash: `src/` = contents, `src` = the directory itself · `-c` checksum compare |
+| **Example** | `rsync -avi --delete --dry-run deploy/ lab26-srv:deploy/` |
+| **Expected output** | `*deleting   stray.conf` · `<f..t...... app.conf` · `… (DRY RUN)` (captured) |
+| **Equivalent** | `robocopy SRC DST /MIR /L` (SMB) · `Copy-Item -ToSession -Recurse` |
+| **Common errors** | Missing/extra trailing slash (nested `dir/dir`) · `--delete` without dry run · rsync missing on the remote side |
+| **Use case** | Config push, backups, website deploys. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/rsync.1.html> |
+
+### ssh port forwarding (-L / -R / -D, -N / -f)
+
+| Field | Detail |
+|---|---|
+| **OS** | All OpenSSH; server controls `AllowTcpForwarding yes/no/local/remote/all`, `PermitOpen`, `PermitListen`, `DisableForwarding` |
+| **Description** | Tunnels TCP through SSH: local forward (your port → host:port seen from the server), remote forward (server port → back to your side), dynamic SOCKS proxy. |
+| **Syntax** | `ssh -L [bind:]lport:host:hport host` · `ssh -R [bind:]rport:host:hport host` · `ssh -D [bind:]port host` · add `-N -f -o ExitOnForwardFailure=yes` |
+| **Parameters** | `-N` no command · `-f` background after auth · `ExitOnForwardFailure=yes` · default bind `127.0.0.1` (`GatewayPorts`) · `-J` combine with jump hosts |
+| **Example** | `ssh -f -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18026:127.0.0.1:8026 lab26-srv && curl -s http://127.0.0.1:18026/` |
+| **Expected output** | `<html><body><h1>LAB26 internal status</h1>…` (captured); with `AllowTcpForwarding local`, `-R` → `Error: remote port forwarding failed for listen port 19026` |
+| **Equivalent** | `ssh.exe -L …` on Windows; no PowerShell Remoting equivalent (`netsh interface portproxy` is unencrypted) |
+| **Common errors** | Binding to `0.0.0.0` · forgetting background tunnels · `bind … Address already in use` · `administratively prohibited` (forwarding disabled) |
+| **Use case** | Reaching internal web UIs/databases via a bastion; also an exfiltration/C2 technique to monitor (T1572). |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ssh.1.html> · <https://man7.org/linux/man-pages/man5/sshd_config.5.html> |
+
+### sshd -t / sshd -T (hardening)
+
+| Field | Detail |
+|---|---|
+| **OS** | openssh-server; Ubuntu 24.04: `Include /etc/ssh/sshd_config.d/*.conf` at the top, first value wins, `ssh.socket` activation (Port/ListenAddress changes: `systemctl daemon-reload` + `systemctl restart ssh.socket`); RHEL: `sshd.service`, SELinux port label |
+| **Description** | `-t` validates the configuration (silent + exit 0 when valid); `-T` prints the **effective** settings after includes and defaults. |
+| **Syntax** | `sudo sshd -t [-f CONFIG]` · `sudo sshd -T [-f CONFIG] [-C user=U,host=H,addr=A]` |
+| **Parameters** | Hardening keys: `PasswordAuthentication no` · `KbdInteractiveAuthentication no` · `PermitRootLogin no`/`prohibit-password` (default) · `MaxAuthTries 3` · `LoginGraceTime 30` · `AllowGroups` · `AllowAgentForwarding no` · `AllowTcpForwarding no`/`local` · `X11Forwarding no` · `LogLevel VERBOSE` · `StrictModes yes` |
+| **Example** | <code>sudo sshd -t && sudo sshd -T &#124; grep -E '^(passwordauthentication&#124;maxauthtries&#124;allowgroups) '</code> |
+| **Expected output** | `maxauthtries 3` · `passwordauthentication no` · `allowgroups lab26-ssh` (captured); typo → `line 1: Bad configuration option: PasswordAuthentcation`, exit 255 |
+| **Equivalent** | `sshd.exe -t` (Windows OpenSSH) · `winrm get winrm/config` |
+| **Common errors** | Restarting without `-t` (lockout) · drop-in numbered after `50-cloud-init.conf` · global settings after a `Match` block · closing the only session before testing |
+| **Use case** | Keys-only hardening with a validated, reversible change. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/sshd.8.html> · <https://man7.org/linux/man-pages/man5/sshd_config.5.html> · <https://documentation.ubuntu.com/server/how-to/security/openssh-server/> |
+
+### Fleet loops (BatchMode, ConnectTimeout, ssh -n)
+
+| Field | Detail |
+|---|---|
+| **OS** | Bash + OpenSSH (any distribution) |
+| **Description** | Run a read-only command on many hosts without prompts or hangs and record each exit status. |
+| **Syntax** | `while read -r h; do ssh -n -o BatchMode=yes -o ConnectTimeout=5 "$h" 'cmd'; rc=$?; …; done < hosts.txt` |
+| **Parameters** | `-n` stops ssh reading the host list from stdin · `BatchMode=yes` fail instead of prompting · `ConnectTimeout=5` bounded wait · rc `255` = unreachable/auth, other non-zero = command failed |
+| **Example** | `bash ~/lab26-fleet.sh; echo "fleet exit=$?"` |
+| **Expected output** | `lab26-srv,0,ok,"ubuntu-lab 0.19"` · `lab26-down,255,ssh-error,"ssh: connect to host 127.0.0.1 port 2299: Connection refused"` · `fleet exit=3` (captured) |
+| **Equivalent** | `Invoke-Command -ComputerName $list -ThrottleLimit 32 -ErrorVariable failed` |
+| **Common errors** | Loop stops after the first host (no `-n`) · scripts hang on prompts · local expansion of the remote command |
+| **Use case** | Fleet health checks, inventory, pre-change verification. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/ssh.1.html> · <https://man7.org/linux/man-pages/man5/ssh_config.5.html> |
