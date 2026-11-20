@@ -64,8 +64,8 @@ Six modules of five days each. Each day takes about **3–4 hours**: reading, de
 | Day | Lesson | Key commands |
 |---|---|---|
 | 26 | [Remote Administration](module-6/day-26.md) | `ssh` `ssh-keygen` `scp` `sftp` · `Enter-PSSession` `Invoke-Command` · WinRM and SSH remoting |
-| 27 | Network Investigation | Case studies: TCP, routing, DNS, captures, Wireshark, Nmap |
-| 28 | Advanced System Troubleshooting | CPU, memory, disk and network bottlenecks · root cause analysis |
+| 27 | [Network Investigation](module-6/day-27.md) | Case studies: TCP, routing, DNS, captures, Wireshark, Nmap |
+| 28 | [Advanced System Troubleshooting](module-6/day-28.md) | CPU, memory, disk and network bottlenecks · root cause analysis |
 | 29 | Integrated Diagnostic Automation | Full Linux and Windows diagnostic scripts · CSV/text reports |
 | 30 | Final Capstone and Assessment | Complete investigation, final exam, certificate template |
 

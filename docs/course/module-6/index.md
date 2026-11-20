@@ -20,8 +20,8 @@ You will administer systems remotely and securely, work through realistic networ
 | Day | Lesson | Lab | Status |
 |---|---|---|---|
 | 26 | [Remote Administration](day-26.md) | [Lab 26](../../labs/lab-26.md) | Published |
-| 27 | Network Investigation | Lab 27 | 2026-11-20 22:00 IST |
-| 28 | Advanced System Troubleshooting | Lab 28 | 2026-11-20 22:00 IST |
+| 27 | [Network Investigation](day-27.md) | [Lab 27](../../labs/lab-27.md) | Published |
+| 28 | [Advanced System Troubleshooting](day-28.md) | [Lab 28](../../labs/lab-28.md) | Published |
 | 29 | Integrated Diagnostic Automation | Lab 29 | 2026-11-21 22:00 IST |
 | 30 | Final Capstone and Assessment | Lab 30 | 2026-11-21 22:00 IST |
 

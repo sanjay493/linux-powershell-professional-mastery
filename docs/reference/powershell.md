@@ -2411,3 +2411,217 @@ Day 24 entries. All work in Windows PowerShell 5.1 and PowerShell 7 unless marke
 | **Common errors** | Admin key placed in the profile instead of `administrators_authorized_keys` · wrong ACL · global settings appended after the `Match Group administrators` block |
 | **Use case** | SSH-based administration and PowerShell 7 SSH remoting to Windows. |
 | **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_install_firstuse> · <https://learn.microsoft.com/en-us/windows-server/administration/openssh/openssh_keymanagement> |
+
+## Network Investigation
+
+### Test-NetConnection -InformationLevel Detailed (investigation use)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows · 5.1 and 7.x (NetTCPIP module) · no admin |
+| **Description** | One test that shows name resolution, the chosen source address and next hop, ping and a TCP connect result. |
+| **Syntax** | `Test-NetConnection [-ComputerName] <String> [-Port <Int32>] [-InformationLevel Detailed] [-TraceRoute] [-Hops <Int32>]` |
+| **Parameters** | `NameResolutionResults` · `SourceAddress` · `NetRoute (NextHop)` · `TcpTestSucceeded` · `-WarningAction SilentlyContinue` in scripts |
+| **Example** | `Test-NetConnection metrics.corp.lab -Port 9100 -InformationLevel Detailed` |
+| **Expected output** | `WARNING: TCP connect to (10.27.2.20 : 9100) failed` … `TcpTestSucceeded : False` (example) |
+| **Equivalent** | `nc -zv`, `curl -w`, `ip route get` |
+| **Common errors** | Treating `False` as "closed": refused and filtered look the same (add timing or a capture) |
+| **Use case** | First-pass classification of a "can't connect" ticket on Windows. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/test-netconnection> |
+
+### Test-Connection -TcpPort (PowerShell 7)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | **PowerShell 7.0+**, all OS |
+| **Description** | Simple TCP port test returning `True`/`False`. |
+| **Syntax** | `Test-Connection -TargetName <String[]> -TcpPort <Int32> [-TimeoutSeconds <Int32>]` |
+| **Parameters** | `-TcpPort` · `-TimeoutSeconds` · `-Quiet` (for ping tests) |
+| **Example** | <code>80, 9100 &#124; ForEach-Object { Test-Connection -TargetName metrics.corp.lab -TcpPort $_ }</code> |
+| **Expected output** | `True` · `False` (example) |
+| **Equivalent** | `nc -zv -w 3 host port` |
+| **Common errors** | Not available in 5.1 · no refused/filtered distinction |
+| **Use case** | Cross-platform port checks in scripts. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/test-connection> |
+
+### Resolve-DnsName -NoHostsFile vs [System.Net.Dns]
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | `Resolve-DnsName`: Windows, 5.1 and 7.x (DnsClient module) · `[System.Net.Dns]`: all editions and OS |
+| **Description** | Separate the DNS answer from what applications get: `-NoHostsFile` ignores the hosts file; `GetHostAddresses` resolves like most .NET applications (hosts file included). |
+| **Syntax** | `Resolve-DnsName <Name> [-Type A] [-Server <String[]>] [-NoHostsFile] [-DnsOnly] [-CacheOnly]` · `[System.Net.Dns]::GetHostAddresses('<name>')` |
+| **Parameters** | `-NoHostsFile` · `-DnsOnly` (DNS protocol only, no LLMNR/NetBIOS) · `-Server` |
+| **Example** | `Resolve-DnsName api.corp.lab -NoHostsFile ; [System.Net.Dns]::GetHostAddresses('api.corp.lab').IPAddressToString` |
+| **Expected output** | `10.27.2.20` (DNS) vs `10.27.2.21` (hosts file) (example) |
+| **Equivalent** | `dig` vs `getent hosts` |
+| **Common errors** | `Clear-DnsClientCache` does not remove hosts-file entries (they are reloaded from the file) |
+| **Use case** | "Works for them, not for me." |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/dnsclient/resolve-dnsname> · <https://learn.microsoft.com/en-us/dotnet/api/system.net.dns.gethostaddresses> |
+
+### Find-NetRoute
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows, 5.1 and 7.x (NetTCPIP) |
+| **Description** | The route and source address Windows would use for a destination. |
+| **Syntax** | `Find-NetRoute -RemoteIPAddress <String>` |
+| **Parameters** | Output: an `IPAddress` object (source) and a `Route` object (`DestinationPrefix`, `NextHop`, `InterfaceAlias`) |
+| **Example** | `Find-NetRoute -RemoteIPAddress 10.27.1.10` (on the server, back towards the client) |
+| **Expected output** | `NextHop 10.27.3.1` … (example) or an error when no route exists |
+| **Equivalent** | `ip route get <addr>` |
+| **Common errors** | Only testing the forward direction |
+| **Use case** | Missing return routes and multi-homed servers. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/find-netroute> |
+
+### Get-NetTCPConnection -State SynSent / Get-NetTCPSetting
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows, 5.1 and 7.x (NetTCPIP) |
+| **Description** | Connections still waiting for a SYN-ACK, and the TCP template values (initial RTO, SYN retries, congestion provider). |
+| **Syntax** | `Get-NetTCPConnection [-RemotePort <UInt16[]>] [-State SynSent]` · `Get-NetTCPSetting [-SettingName <String[]>]` |
+| **Parameters** | `InitialRtoMs` · `MaxSynRetransmissions` · `CongestionProvider` |
+| **Example** | <code>Get-NetTCPSetting -SettingName Internet &#124; Select-Object SettingName, InitialRtoMs, MaxSynRetransmissions</code> |
+| **Expected output** | `Internet  3000  …` (example; values differ by Windows version) |
+| **Equivalent** | `ss -tn state syn-sent` · `sysctl net.ipv4.tcp_syn_retries` |
+| **Common errors** | Expecting 1-second SYN retries on Windows (initial RTO is usually 3 s) |
+| **Use case** | Interpreting 3 s / 9 s connect delays on Windows clients. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection> · <https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpsetting> |
+
+### curl.exe -w (on Windows)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | `curl.exe` built into Windows 10 1803+ / Server 2019+; callable from 5.1 and 7 |
+| **Description** | The real curl: phase timings, exit codes and `--resolve`, as on Linux. |
+| **Syntax** | `curl.exe -s -o NUL -m <s> -w "<format>" <URL>` · exit code in `$LASTEXITCODE` |
+| **Parameters** | Same `%{time_*}` variables · `-o NUL` (Windows null device) |
+| **Example** | `curl.exe -s -o NUL -m 10 -w "dns=%{time_namelookup} connect=%{time_connect} total=%{time_total}\n" http://www.corp.lab/` |
+| **Expected output** | `dns=0.002104 connect=3.016480 total=3.019402` (example: one lost SYN on Windows) |
+| **Equivalent** | `curl -w` on Linux |
+| **Common errors** | Typing `curl` in Windows PowerShell 5.1 runs `Invoke-WebRequest` (alias) |
+| **Use case** | Phase timing without extra tools. |
+| **Docs** | <https://learn.microsoft.com/en-us/virtualization/community/team-blog/2017/20171219-tar-and-curl-come-to-windows> |
+
+### pktmon capture and etl2pcap
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows 10 2004+ / Server 2022 syntax · **elevated** |
+| **Description** | Built-in packet capture; convert to pcapng for Wireshark/TShark. |
+| **Syntax** | `pktmon filter add [-i <ip>] [-p <port>]` · `pktmon start --capture [--pkt-size <bytes>] [--file-name <etl>]` · `pktmon stop` · `pktmon etl2pcap <etl> --out <pcapng>` · `pktmon filter remove` |
+| **Parameters** | `--pkt-size 0` whole packets (default 128 bytes) · `pktmon filter list` |
+| **Example** | `pktmon filter add -p 443 ; pktmon start --capture ; pktmon stop ; pktmon etl2pcap PktMon.etl --out case.pcapng` |
+| **Expected output** | `Packets total: 2611` (example) |
+| **Equivalent** | `tcpdump -w` |
+| **Common errors** | Forgetting `pktmon filter remove` (later captures stay filtered) · not elevated |
+| **Use case** | Capturing evidence on Windows endpoints and servers. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/networking/technologies/pktmon/pktmon> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/pktmon-etl2pcap> |
+
+### TLS certificate inspection (SslStream + X509Certificate2)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | .NET classes, 5.1 and 7.x, all OS |
+| **Description** | Read the certificate a server presents and the policy errors (`RemoteCertificateNameMismatch`, `RemoteCertificateChainErrors`). The callback accepts the certificate **only to inspect it**. |
+| **Syntax** | `New-Object System.Net.Sockets.TcpClient(host, 443)` → `New-Object System.Net.Security.SslStream(stream, $false, $callback)` → `.AuthenticateAsClient(host)` → `X509Certificate2($ssl.RemoteCertificate)` |
+| **Parameters** | `Subject` · `Issuer` · `NotAfter` · `Thumbprint` · `DnsNameList` (added by PowerShell) |
+| **Example** | See Day 27, *Inspecting a TLS certificate from PowerShell* |
+| **Expected output** | `Subject : CN=legacy.corp.lab` · `Policy errors: RemoteCertificateNameMismatch, RemoteCertificateChainErrors` (example) |
+| **Equivalent** | `openssl s_client …` piped to `openssl x509 -noout -subject -ext subjectAltName` |
+| **Common errors** | Reusing an "accept all" callback in production code · `-SkipCertificateCheck` (7) as a fix |
+| **Use case** | Certificate errors after migrations; certificate inventories. |
+| **Docs** | <https://learn.microsoft.com/en-us/dotnet/api/system.net.security.sslstream> · <https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.x509certificates.x509certificate2> |
+
+## Performance & Troubleshooting
+
+### Get-Counter
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows · 5.1 and 7.x **on Windows only** · no admin for local counters |
+| **Description** | Samples performance counters: CPU, queue, memory, disk latency, network, TCP. |
+| **Syntax** | <code>Get-Counter [-Counter] &lt;String[]&gt; [-SampleInterval &lt;Int32&gt;] [-MaxSamples &lt;Int64&gt; &#124; -Continuous] [-ComputerName &lt;String[]&gt;]</code> · `Get-Counter -ListSet <String>` |
+| **Parameters** | `\Processor(_Total)\% Processor Time` · `\System\Processor Queue Length` · `\Memory\Available MBytes` · `\Memory\Pages/sec` · `\PhysicalDisk(*)\Avg. Disk sec/Read` · `\PhysicalDisk(*)\Current Disk Queue Length` · `\Network Interface(*)\Bytes Total/sec` |
+| **Example** | `Get-Counter '\Processor(*)\% Processor Time','\System\Processor Queue Length' -SampleInterval 1 -MaxSamples 5` |
+| **Expected output** | `\\win11-lab\processor(_total)\% processor time : 97.3` (example) |
+| **Equivalent** | `vmstat 1`, `mpstat -P ALL 1`, `iostat -xz 1` |
+| **Common errors** | Counter paths are **localised** (non-English Windows: use `Get-Counter -ListSet` or the CIM classes) · `Import-Counter`/`Export-Counter` exist only in 5.1 |
+| **Use case** | The Windows version of the 60-second checklist. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-counter> |
+
+### Win32_PerfFormattedData_PerfProc_Process / Get-Process (per process)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows · 5.1 and 7.x (`Get-CimInstance`) · `Get-Process` all OS |
+| **Description** | Per-process CPU %, I/O rates, private working set and handle count; `Get-Process` gives total CPU seconds, memory and handles. |
+| **Syntax** | `Get-CimInstance Win32_PerfFormattedData_PerfProc_Process` · <code>Get-Process &#124; Sort-Object CPU -Descending</code> |
+| **Parameters** | `PercentProcessorTime` (per logical CPU: divide by `[Environment]::ProcessorCount`) · `IOWriteBytesPersec` · `IOWriteOperationsPersec` · `WorkingSetPrivate` · `HandleCount` · `Get-Process` `CPU` is seconds, not % |
+| **Example** | <code>Get-CimInstance Win32_PerfFormattedData_PerfProc_Process &#124; Where-Object Name -notin '_Total','Idle' &#124; Sort-Object PercentProcessorTime -Descending &#124; Select-Object -First 5 Name, IDProcess, PercentProcessorTime, HandleCount</code> |
+| **Expected output** | `powershell 4242 100 312` (example) |
+| **Equivalent** | `pidstat -u -d 1`, `top`, `ls /proc/PID/fd` |
+| **Common errors** | Reading `CPU` from `Get-Process` as a percentage |
+| **Use case** | Naming the process behind high CPU, I/O or handle growth. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/cimcmdlets/get-ciminstance> · <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/get-process> |
+
+### Win32_OperatingSystem (memory and uptime)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows · 5.1 and 7.x |
+| **Description** | Free physical and virtual (commit) memory, total memory and last boot time. |
+| **Syntax** | <code>Get-CimInstance Win32_OperatingSystem &#124; Select-Object FreePhysicalMemory, FreeVirtualMemory, TotalVisibleMemorySize, LastBootUpTime</code> |
+| **Parameters** | Memory values are in **KiB** |
+| **Example** | <code>$os = Get-CimInstance Win32_OperatingSystem; [math]::Round($os.FreePhysicalMemory / 1MB, 1)</code> (GiB free) |
+| **Expected output** | `5.8` (example) |
+| **Equivalent** | `free -m`, `uptime -s` |
+| **Common errors** | Treating KiB as bytes |
+| **Use case** | Memory and reboot checks in triage scripts. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows/win32/cimwin32prov/win32-operatingsystem> |
+
+### Get-WinEvent for slowness, crashes and resource exhaustion
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows · 5.1 and 7.x |
+| **Description** | Events that explain "slow" and "it rebooted": 2004 (Resource-Exhaustion-Detector, low virtual memory), 41 (Kernel-Power, unexpected reboot), 6008 (unexpected shutdown), 1001 (BugCheck), Application 1000/1002 (crash/hang), disk 7/153/129. |
+| **Syntax** | `Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 41, 6008, 1001, 2004; StartTime = (Get-Date).AddDays(-1) }` |
+| **Parameters** | `ProviderName` · `Level` · `-MaxEvents` |
+| **Example** | `Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 2004 } -MaxEvents 5` |
+| **Expected output** | `Windows successfully diagnosed a low virtual memory condition…` (example) |
+| **Equivalent** | `dmesg -T`, `journalctl -k -g 'Killed process'`, `last -x reboot` |
+| **Common errors** | Searching the Application log for kernel events |
+| **Use case** | Building the incident timeline. |
+| **Docs** | <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.diagnostics/get-winevent> |
+
+### typeperf / logman / relog (recording counters)
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows built-in tools · `logman create/start/stop` elevated |
+| **Description** | Sample counters to the console or CSV (`typeperf`), record them continuously in a circular log (`logman`), and convert logs (`relog`). |
+| **Syntax** | `typeperf "<counter>" -si 1 -sc 10` · `logman create counter NAME -c "<counter>" -si 00:00:15 -o C:\PerfLogs\NAME -f bincirc -max 512` · `logman start NAME` · `relog in.blg -f csv -o out.csv` |
+| **Parameters** | `-si` interval · `-sc` samples · `-f bincirc` circular binary · `-max` MB |
+| **Example** | `typeperf "\Processor(_Total)\% Processor Time" -si 1 -sc 5` |
+| **Expected output** | CSV lines `"11/20/2026 22:31:07.123","97.31"` (example) |
+| **Equivalent** | `sar` with `sysstat-collect.timer` |
+| **Common errors** | No collector running when the incident happens |
+| **Use case** | Evidence for intermittent slowness. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/typeperf> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/logman> · <https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/relog> |
+
+### Resource Monitor, Performance Monitor and WPR
+
+| Field | Detail |
+|---|---|
+| **Version / OS** | Windows built-in · `wpr` elevated |
+| **Description** | `resmon.exe` (per-process CPU/disk/network, *Analyze Wait Chain* for hung processes), `perfmon.exe` (graphs, data collector sets), `wpr` (Windows Performance Recorder traces for WPA). |
+| **Syntax** | `resmon.exe` · `perfmon.exe` · `wpr -start GeneralProfile -start CPU` · `wpr -stop C:\Temp\trace.etl` |
+| **Parameters** | WPR profiles: `GeneralProfile`, `CPU`, `DiskIO`, `FileIO` |
+| **Example** | `wpr -start CPU ; Start-Sleep 30 ; wpr -stop C:\Temp\cpu.etl` |
+| **Expected output** | A trace file to open in Windows Performance Analyzer (example) |
+| **Equivalent** | `top`, `strace -c`, `perf` |
+| **Common errors** | Recording for hours (huge traces) |
+| **Use case** | Deep CPU and wait analysis when counters are not enough. |
+| **Docs** | <https://learn.microsoft.com/en-us/windows-hardware/test/wpt/windows-performance-recorder> |

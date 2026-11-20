@@ -36,6 +36,8 @@ Every lesson ends with a **Quiz** section. Each question has a collapsible answe
 | 24 | [Text and Data Processing](../course/module-5/day-24.md#quiz) |
 | 25 | [Task Scheduling and Automation](../course/module-5/day-25.md#quiz) |
 | 26 | [Remote Administration](../course/module-6/day-26.md#quiz) |
+| 27 | [Network Investigation](../course/module-6/day-27.md#quiz) |
+| 28 | [Advanced System Troubleshooting](../course/module-6/day-28.md#quiz) |
 
 ## Module tests
 

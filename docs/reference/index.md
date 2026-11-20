@@ -71,3 +71,5 @@ A searchable reference for every command taught in the course. Use the **search 
 | Text & data processing (sed, awk, sort, jq, CSV, JSON) | :material-check: | :material-check: | Day 24 |
 | Scheduling & automation | :material-check: | :material-check: | Day 25 |
 | Remote administration | :material-check: | :material-check: | Day 26 |
+| Network investigation (phase timing, TLS, TCP analysis, evidence) | :material-check: | :material-check: | Day 27 |
+| Performance & troubleshooting (USE method, sysstat, PSI, OOM, counters) | :material-check: | :material-check: | Day 28 |

@@ -1679,4 +1679,4 @@ Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-PowerShell/Operationa
 
 ---
 
-**Previous:** [Day 25: Task Scheduling and Automation](../module-5/day-25.md) · **Next:** Day 27: Network Investigation (see the [release schedule](../schedule.md))
+**Previous:** [Day 25: Task Scheduling and Automation](../module-5/day-25.md) · **Next:** [Day 27: Network Investigation](day-27.md)

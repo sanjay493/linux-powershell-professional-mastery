@@ -599,3 +599,44 @@ Rows are added as each day is released. ⚠ marks behaviour that differs in an i
 | Validate server config | `sudo sshd -t` · `sudo sshd -T` | `winrm get winrm/config` · `sshd.exe -t` | Ubuntu 24.04 Port: `ssh.socket` |
 | Who logged in (which key) | `journalctl _COMM=sshd -g 'Accepted publickey'` + `ssh-keygen -lf authorized_keys` | Security 4624 type 3 · WinRM/Operational 91 · PowerShell 4104 | |
 | Record a session | `script -q -a log -c 'ssh host'` | `Start-Transcript` | |
+
+## Network investigation
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| Phase timings of one request | `curl -s -o /dev/null -m 10 -w @fmt URL` | `curl.exe -s -o NUL -m 10 -w "<fmt>" URL` | In 5.1 `curl` is an alias of `Invoke-WebRequest`: type `curl.exe` |
+| Test one server for a name | `curl --resolve host:443:10.0.0.5 https://host/` | `curl.exe --resolve host:443:10.0.0.5 https://host/` | No DNS or hosts change |
+| What applications resolve | `getent ahostsv4 name` | `[System.Net.Dns]::GetHostAddresses('name')` | Both include the hosts file |
+| What DNS says | `dig +short name` | `Resolve-DnsName name -NoHostsFile` | ⚠ `dig` ignores `/etc/hosts` and the search list (without `+search`) |
+| Route to an address | `ip route get a` | `Find-NetRoute -RemoteIPAddress a` | Run on **both** ends |
+| TCP path to one port | `sudo traceroute -n -T -p 9100 host` | — | Windows `tracert` is ICMP only |
+| Refused vs filtered | `nc -zv -w 3 host port` · `nmap -sT -Pn -n --reason -p port host` | `Test-NetConnection host -Port port` + timing · `Get-NetTCPConnection -State SynSent` | ⚠ `TcpTestSucceeded` is `False` for both |
+| Lost-SYN signature | connect ≈ 1 s / 3 s | connect ≈ 3 s / 9 s (`Get-NetTCPSetting` → `InitialRtoMs`) | |
+| TCP health of a flow | `ss -tin 'sport = :80'` | `Get-Counter '\TCPv4\Segments Retransmitted/sec'` | Per-connection on Linux, per-host on Windows |
+| Retransmission counters | `nstat -az TcpRetransSegs TcpExtTCPSynRetrans` | `Get-Counter '\TCPv4\Segments Retransmitted/sec'` | |
+| Capture to a file | `sudo tcpdump -ni eth0 -s 128 -w case.pcap 'filter'` | `pktmon filter add -p 443; pktmon start --capture; pktmon stop` | pktmon elevated; `pktmon etl2pcap` to convert |
+| Analyse a capture | `tshark -n -r f -Y 'tcp.analysis.flags'` · `-q -z conv,tcp` · `-q -z expert` | `tshark.exe` (Wireshark for Windows), same filters | |
+| Certificate a server presents | <code>echo &#124; openssl s_client -connect h:443 -servername h &#124; openssl x509 -noout -subject -ext subjectAltName</code> | .NET `SslStream` + `X509Certificate2` (Day 27 snippet) | ⚠ never fix with `-k` / `-SkipCertificateCheck` |
+| Firewall rule hit? | `sudo nft list ruleset` (counters) | `Get-NetFirewallRule` · `pfirewall.log` | |
+| Hash evidence | `sha256sum f` | `Get-FileHash f -Algorithm SHA256` | |
+
+## Performance and troubleshooting
+
+| Task | Bash (Ubuntu) | PowerShell | Notes |
+|---|---|---|---|
+| Load / CPU queue | `uptime` · `vmstat 1` (`r` column) | `Get-Counter '\System\Processor Queue Length'` | Linux load includes D-state tasks |
+| CPU per core | `mpstat -P ALL 1` | `Get-Counter '\Processor(*)\% Processor Time'` | sysstat package |
+| CPU per process | `pidstat -u 1` (`%wait` = saturation) | `Get-CimInstance Win32_PerfFormattedData_PerfProc_Process` | ⚠ `Get-Process` `CPU` is seconds, not % |
+| Memory available | `free -m` (`available`) | `Get-Counter '\Memory\Available MBytes'` | ⚠ low "free" is normal on Linux |
+| Paging / swapping | `vmstat 1` (`si`/`so`) | `Get-Counter '\Memory\Pages/sec'` | |
+| Stall time | `cat /proc/pressure/{cpu,memory,io}` | — | PSI is Linux-only |
+| Disk latency and queue | `iostat -xz 1` (`r_await`, `w_await`, `aqu-sz`) | `Get-Counter '\PhysicalDisk(*)\Avg. Disk sec/Write','\PhysicalDisk(*)\Current Disk Queue Length'` | ⚠ `%util` misleads on SSD/NVMe |
+| Who is doing I/O | `pidstat -d 1` · `sudo iotop-c -o` | `IOWriteBytesPersec` in the PerfProc CIM class | |
+| Out-of-memory kills | <code>sudo dmesg -T &#124; grep -i 'killed process'</code> | `Get-WinEvent -FilterHashtable @{LogName='System'; Id=2004}` | |
+| Limit a leaky job | `sudo systemd-run --scope -p MemoryMax=500M CMD` | no built-in cmdlet (Job Objects via API) | |
+| Descriptor / handle leak | <code>sudo ls /proc/PID/fd &#124; wc -l</code> · `lsof -p PID` | `(Get-Process -Id PID).HandleCount` | `EMFILE` = "Too many open files" |
+| Stuck process | `ps -o stat,wchan:20 -p PID` · `sudo strace -p PID` | Resource Monitor → Analyze Wait Chain | |
+| Syscall / CPU profile | `sudo strace -c -f -p PID` | `wpr -start CPU` / `wpr -stop f.etl` + WPA | |
+| Inodes exhausted | `df -i` | — | NTFS has no fixed inode table |
+| Accept queue overflow | `ss -lnt` · `nstat -az TcpExtListenOverflows` | — | |
+| History | `sar -q -f /var/log/sysstat/saDD` | `logman` + `relog` | Enable collection **before** you need it |

@@ -2565,3 +2565,307 @@ Day 24 entries. All tools are part of a standard Ubuntu 24.04 installation excep
 | **Common errors** | Loop stops after the first host (no `-n`) · scripts hang on prompts · local expansion of the remote command |
 | **Use case** | Fleet health checks, inventory, pre-change verification. |
 | **Docs** | <https://man7.org/linux/man-pages/man1/ssh.1.html> · <https://man7.org/linux/man-pages/man5/ssh_config.5.html> |
+
+## Network Investigation
+
+### curl -w (request phase timings)
+
+| Field | Detail |
+|---|---|
+| **OS** | curl (Ubuntu 24.04: 8.5.0); also `curl.exe` on Windows 10 1803+ |
+| **Description** | Prints variables after a transfer; the cumulative `time_*` values split a request into DNS, TCP connect, TLS, server time and transfer. |
+| **Syntax** | `curl -s -o /dev/null -m SECS -w 'FORMAT' URL` · `curl -w @format-file URL` |
+| **Parameters** | `%{time_namelookup}` `%{time_connect}` `%{time_appconnect}` `%{time_starttransfer}` `%{time_total}` · `%{http_code}` `%{remote_ip}` `%{local_port}` `%{ssl_verify_result}` `%{num_connects}` · exit codes 6 (resolve), 7 (connect), 28 (timeout), 35 (TLS), 60 (certificate) |
+| **Example** | `curl -s -o /dev/null -m 10 -w 'dns=%{time_namelookup} connect=%{time_connect} ttfb=%{time_starttransfer} total=%{time_total}\n' http://www.corp.lab/` |
+| **Expected output** | `dns=0.000409 connect=1.004998 ttfb=1.006015 total=1.006065` (captured in Lab 27: a lost SYN/SYN-ACK costs 1 s) |
+| **Equivalent** | `curl.exe -w` · `Measure-Command { Invoke-WebRequest … }` (total only) |
+| **Common errors** | Reading the cumulative values as durations · no `-m` (a script hangs for minutes) · proxy variables silently used |
+| **Use case** | Deciding in one command whether a slow request is DNS, network, TLS or application. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/curl.1.html> |
+
+### curl --resolve / -v / --cacert
+
+| Field | Detail |
+|---|---|
+| **OS** | curl, any distribution |
+| **Description** | `--resolve` pins a host name to an address for one request; `-v` shows the addresses tried and TLS details; `--cacert` trusts a private CA for one request. |
+| **Syntax** | `curl --resolve HOST:PORT:ADDR URL` · `curl -sv URL` · `curl --cacert ca.crt https://HOST/` |
+| **Parameters** | `--resolve` (repeatable) · `-v` · `--cacert FILE` · `--noproxy '*'` · never `-k` in scripts |
+| **Example** | `curl -sS -m 4 --resolve api.corp.lab:8080:10.27.2.20 -o /dev/null -w '%{http_code} %{remote_ip}\n' http://api.corp.lab:8080/` |
+| **Expected output** | `200 10.27.2.20` (captured) |
+| **Equivalent** | `curl.exe --resolve …` · `Invoke-WebRequest` with a `Host` header |
+| **Common errors** | `-k` left in a script · forgetting the port in `--resolve` |
+| **Use case** | Testing a new server before a DNS change; proving a hosts-file override. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/curl.1.html> |
+
+### getent hosts / ahosts (system resolver)
+
+| Field | Detail |
+|---|---|
+| **OS** | glibc `getent` (always installed) |
+| **Description** | Resolves names through NSS exactly like applications: `/etc/nsswitch.conf` order, usually the hosts file before DNS. |
+| **Syntax** | `getent hosts NAME` · `getent ahosts NAME` · `getent ahostsv4 NAME` |
+| **Parameters** | `hosts` (first address) · `ahosts`/`ahostsv4` (every address in connection order) |
+| **Example** | `getent hosts api.corp.lab ; dig +short api.corp.lab` |
+| **Expected output** | `10.27.2.21      api.corp.lab api` then `10.27.2.20` (captured: a stale hosts entry overrides DNS) |
+| **Equivalent** | `[System.Net.Dns]::GetHostAddresses('name')` vs `Resolve-DnsName -NoHostsFile` |
+| **Common errors** | Trusting `dig` to show what applications use · `dig` ignores the `search` domain without `+search` |
+| **Use case** | "Works for them, not for me" tickets. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/getent.1.html> · <https://man7.org/linux/man-pages/man5/nsswitch.conf.5.html> |
+
+### traceroute -T (TCP SYN traceroute)
+
+| Field | Detail |
+|---|---|
+| **OS** | `traceroute` package (Ubuntu); `-T` needs root |
+| **Description** | Sends TCP SYN probes to a destination port with increasing TTL; the last hop that answers is the last device that let a connection attempt through. |
+| **Syntax** | `sudo traceroute -n -T -p PORT [-q N] [-w SECS] [-m HOPS] HOST` |
+| **Parameters** | `-T` TCP SYN · `-p` port · `-n` no DNS · `-q 1 -w 1` quick |
+| **Example** | `sudo traceroute -n -T -p 9100 -q 1 -w 1 -m 4 10.27.2.20` |
+| **Expected output** | `1  10.27.1.1  0.094 ms` then `2  *` … (captured: the router drops port 9100; `-p 80` reaches the host at hop 2) |
+| **Equivalent** | none built in on Windows (`tracert` is ICMP only) |
+| **Common errors** | Running without root · reading `*` as "the hop is down" (it may just not send ICMP) |
+| **Use case** | Locating the firewall that drops one port. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/traceroute.db.1.html> |
+
+### nmap --reason / --script ssl-cert (investigation use)
+
+| Field | Detail |
+|---|---|
+| **OS** | nmap 7.94 (Ubuntu 24.04); `-sT` needs no root |
+| **Description** | Measures what the network does to packets on specific ports from one vantage point, with the reason for each state; `ssl-cert` reads the certificate a TLS service presents. |
+| **Syntax** | `nmap -sT -Pn -n --reason -p PORTS HOST` · `nmap -Pn -n -p 443 --script ssl-cert HOST` |
+| **Parameters** | Reasons: `syn-ack` (open) · `conn-refused` (closed) · `no-response` (filtered) · `host-unreach` · `-Pn` skip discovery · `-n` no DNS · `-oN file` save |
+| **Example** | `nmap -sT -Pn -n --reason -p 80,9100,9200 10.27.2.20` |
+| **Expected output** | `9100/tcp filtered jetdirect  no-response` · `9200/tcp closed   wap-wsp    conn-refused` (captured) |
+| **Equivalent** | `Test-NetConnection -Port` (True/False only) · nmap for Windows |
+| **Common errors** | Scanning without authorisation · trusting the SERVICE column (a port-number guess without `-sV`) |
+| **Use case** | Classifying "can't connect" tickets as filtered vs closed. |
+| **Docs** | <https://nmap.org/book/man-port-scanning-basics.html> · <https://nmap.org/nsedoc/scripts/ssl-cert.html> |
+
+### openssl s_client / openssl x509
+
+| Field | Detail |
+|---|---|
+| **OS** | OpenSSL 3.0 (Ubuntu 24.04) |
+| **Description** | `s_client` performs a TLS handshake and reports the chain and verification result; `x509` prints certificate fields. |
+| **Syntax** | <code>echo &#124; openssl s_client -connect HOST:PORT -servername NAME [-CAfile F] [-verify_hostname NAME] [-showcerts]</code> · `openssl x509 -noout -subject -issuer -dates -ext subjectAltName` |
+| **Parameters** | `-servername` (SNI) · `-CAfile` · `-verify_hostname` · `-showcerts` · `x509 -dates` / `-ext subjectAltName` |
+| **Example** | <code>echo &#124; openssl s_client -connect 10.27.2.20:443 -servername secure.corp.lab 2>/dev/null &#124; openssl x509 -noout -subject -ext subjectAltName</code> |
+| **Expected output** | `subject=CN = legacy.corp.lab` · `DNS:legacy.corp.lab` (captured: name mismatch) |
+| **Equivalent** | .NET `SslStream` + `X509Certificate2` in PowerShell |
+| **Common errors** | Omitting `-servername` (default certificate) · expecting the CN to matter when SANs exist |
+| **Use case** | Certificate errors after migrations, renewals or missing intermediates. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/openssl-s_client.1ssl.html> · <https://manpages.ubuntu.com/manpages/noble/man1/openssl-x509.1ssl.html> |
+
+### ss -tin (TCP internals)
+
+| Field | Detail |
+|---|---|
+| **OS** | iproute2 (Ubuntu 24.04: 6.1) |
+| **Description** | Per-connection kernel TCP state: RTT, minimum RTT, retransmissions, lost/SACKed segments, congestion window, delivery rate, receiver-window limits. |
+| **Syntax** | `ss -tin [FILTER]` |
+| **Parameters** | `rtt:avg/mdev` · `minrtt` · `retrans:now/total` · `lost` · `bytes_retrans` · `cwnd` · `delivery_rate` · `rwnd_limited` |
+| **Example** | `ss -tin 'sport = :80'` (on the sender, during a transfer) |
+| **Expected output** | `rtt:406.135/26.525 … retrans:6/48 lost:6 … minrtt:0.02` (captured: queueing and loss) |
+| **Equivalent** | `Get-NetTCPConnection` (state only) · `Get-Counter '\TCPv4\…'` |
+| **Common errors** | Reading it on the receiver (the sender has the useful counters) · forgetting the second (info) line |
+| **Use case** | Proving loss/bufferbloat for one flow. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ss.8.html> |
+
+### nstat (kernel network counters)
+
+| Field | Detail |
+|---|---|
+| **OS** | iproute2 |
+| **Description** | Reads SNMP/netstat counters. Without `-a` it prints the change since the last run (history file in `/tmp` per user). |
+| **Syntax** | `nstat [-a] [-z] [COUNTER…]` |
+| **Parameters** | `-a` absolute · `-z` include zeros · `TcpRetransSegs` · `TcpExtTCPSynRetrans` · `IpOutNoRoutes` · `TcpExtListenOverflows` |
+| **Example** | `nstat -az TcpRetransSegs TcpExtTCPSynRetrans IpOutNoRoutes` |
+| **Expected output** | `IpOutNoRoutes 11 0.0` (captured on a host with no return route) |
+| **Equivalent** | `Get-Counter '\TCPv4\Segments Retransmitted/sec'` · `netstat -s` |
+| **Common errors** | Delta mode confusion across namespaces/users (use `-a`) |
+| **Use case** | Confirming that a host drops replies for lack of a route; retransmission trends. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/nstat.8.html> |
+
+### tshark analysis (-Y tcp.analysis.*, -z conv/io/expert)
+
+| Field | Detail |
+|---|---|
+| **OS** | tshark (Ubuntu 24.04: 4.2.2); reading files needs no root |
+| **Description** | Wireshark's dissectors, display filters and statistics on the command line. |
+| **Syntax** | `tshark -n -r FILE [-Y FILTER] [-T fields -e F … -E header=y]` · `tshark -n -r FILE -q -z STAT` |
+| **Parameters** | Filters: `tcp.analysis.retransmission` · `tcp.analysis.duplicate_ack` · `tcp.analysis.lost_segment` · `tcp.analysis.flags` · `tcp.flags.reset == 1` · `icmp.type == 3` · `tls.handshake.type == 1` · Stats: `conv,tcp` · `io,stat,1,COUNT(f)f` · `expert[,warn]` · `follow,tcp,ascii,N` |
+| **Example** | `tshark -n -r www.pcap -q -z 'io,stat,1,COUNT(tcp.analysis.retransmission)tcp.analysis.retransmission'` |
+| **Expected output** | An I/O table with one row per second, e.g. <code>&#124;  0 &lt;&gt; 1  &#124;    37 &#124;</code> (captured; see Day 27 Demo 2) |
+| **Equivalent** | `tshark.exe` from Wireshark for Windows (same syntax) on a `pktmon etl2pcap` file |
+| **Common errors** | Using capture-filter (BPF) syntax with `-Y` · tiny snap length that cuts TCP options |
+| **Use case** | Summarising a large capture in seconds; locating loss. |
+| **Docs** | <https://www.wireshark.org/docs/man-pages/tshark.html> · <https://www.wireshark.org/docs/wsug_html_chunked/ChAdvTCPAnalysis.html> |
+
+### capinfos / editcap / mergecap (evidence handling)
+
+| Field | Detail |
+|---|---|
+| **OS** | wireshark-common (installed with tshark) |
+| **Description** | `capinfos` describes a capture (packets, times, duration, hashes); `editcap` slices by frame range or time; `mergecap` merges by timestamp. |
+| **Syntax** | `capinfos FILE` · `editcap -r IN OUT RANGE` · `editcap -A START -B END IN OUT` · `mergecap -w OUT IN…` |
+| **Parameters** | `-r` keep the listed frames · `-A`/`-B` time window · `mergecap -w` output |
+| **Example** | `capinfos a-cli.pcap ; editcap -r a-cli.pcap syn-only.pcap 9-12 ; sha256sum a-cli.pcap` |
+| **Expected output** | `Number of packets: 12` · `SHA256: dfb40cec…` (captured) |
+| **Equivalent** | `Get-FileHash`; the same tools in Wireshark for Windows |
+| **Common errors** | Merging two captures of the same packets (duplicates) · sharing full captures with personal data |
+| **Use case** | Packaging and sharing evidence. |
+| **Docs** | <https://www.wireshark.org/docs/man-pages/capinfos.html> · <https://www.wireshark.org/docs/man-pages/editcap.html> · <https://www.wireshark.org/docs/man-pages/mergecap.html> |
+
+## Performance & Troubleshooting
+
+### uptime / /proc/loadavg
+
+| Field | Detail |
+|---|---|
+| **OS** | procps (all distributions) |
+| **Description** | 1-, 5- and 15-minute load averages. On Linux the load counts runnable tasks **and** tasks in uninterruptible sleep (D state), so disk or NFS waits raise it too. |
+| **Syntax** | `uptime` · `cat /proc/loadavg` · `nproc` |
+| **Parameters** | Compare load with `nproc`; the trend (1 vs 15 min) shows whether it is rising or falling |
+| **Example** | `uptime; nproc` |
+| **Expected output** | `load average: 4.12, 2.37, 1.05` and `4` (example: rising, about one task per CPU) |
+| **Equivalent** | `Get-Counter '\System\Processor Queue Length'` |
+| **Common errors** | Treating load as CPU % · ignoring D-state tasks |
+| **Use case** | The first five seconds of any "slow server" ticket. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/uptime.1.html> · <https://man7.org/linux/man-pages/man5/proc_loadavg.5.html> |
+
+### vmstat
+
+| Field | Detail |
+|---|---|
+| **OS** | procps (Ubuntu 24.04: 4.0.4) |
+| **Description** | Whole-machine snapshot per interval: run queue, blocked tasks, memory, swap in/out, I/O, CPU categories. |
+| **Syntax** | `vmstat [-w] [INTERVAL [COUNT]]` |
+| **Parameters** | `r` runnable · `b` D state · `si`/`so` swap in/out · `bi`/`bo` blocks · `us sy id wa st` · `-w` wide · first line = average since boot (ignore it) |
+| **Example** | `vmstat -w 1 5` |
+| **Expected output** | `r` above the CPU count = CPU saturation; non-zero `si`/`so` = memory pressure (see Day 28 Demo 1, captured) |
+| **Equivalent** | `Get-Counter` processor, queue and memory counters |
+| **Common errors** | Reading the first line as current · `wa` as "disk busy" |
+| **Use case** | Deciding which resource to look at next. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/vmstat.8.html> |
+
+### mpstat -P ALL / pidstat / iostat -xz (sysstat)
+
+| Field | Detail |
+|---|---|
+| **OS** | sysstat package (Ubuntu 24.04: 12.6.1; `sudo apt install sysstat`) |
+| **Description** | `mpstat`: per-CPU categories. `pidstat`: per-process CPU (`-u`), disk (`-d`), memory faults (`-r`), context switches (`-w`). `iostat -x`: per-device latency and queue. |
+| **Syntax** | `mpstat -P ALL 1 3` · <code>pidstat [-u&#124;-d&#124;-r&#124;-w] [-p PID&#124;-C REGEX] 1 3</code> · `iostat -xz 1 3` |
+| **Parameters** | `%steal` `%iowait` · pidstat `%wait` (waiting for a CPU) · iostat `r_await` `w_await` `aqu-sz` `f/s` `%util` |
+| **Example** | `pidstat -u 1 3` · `iostat -xz 1 3` |
+| **Expected output** | One busy CPU at `%usr 100` in mpstat; pidstat `%wait` far above 0 = CPU saturation; high `w_await` with high `f/s` = synchronous writes (Day 28, captured) |
+| **Equivalent** | `Get-Counter '\Processor(*)\% Processor Time'` · `Win32_PerfFormattedData_PerfProc_Process` · `\PhysicalDisk(*)\Avg. Disk sec/Write` |
+| **Common errors** | `%util` 100 % on SSD/NVMe does not mean saturated · `pidstat -d` may credit a reaped child's I/O to its parent |
+| **Use case** | Naming the CPU, process or device behind the symptom. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/mpstat.1.html> · <https://manpages.ubuntu.com/manpages/noble/man1/pidstat.1.html> · <https://manpages.ubuntu.com/manpages/noble/man1/iostat.1.html> |
+
+### sar (history)
+
+| Field | Detail |
+|---|---|
+| **OS** | sysstat; Ubuntu 24.04 collects every 10 min via `sysstat-collect.timer` once `systemctl enable --now sysstat`; `HISTORY=7` days in `/etc/sysstat/sysstat`; the cron path also checks `ENABLED` in `/etc/default/sysstat` |
+| **Description** | Live or historical system activity: CPU, queue, memory, network, TCP. |
+| **Syntax** | <code>sar [-u&#124;-q&#124;-r&#124;-n DEV,EDEV&#124;-n TCP,ETCP] [INTERVAL COUNT]</code> · `sar -q -f /var/log/sysstat/saDD -s HH:MM:SS -e HH:MM:SS` |
+| **Parameters** | `-q` load/queue · `-r` memory · `-n DEV`/`EDEV` interface rates/errors · `-n TCP,ETCP` TCP rates/retransmissions |
+| **Example** | `sar -q -f /var/log/sysstat/sa20 -s 02:00:00 -e 03:00:00` |
+| **Expected output** | 10-minute rows of `runq-sz plist-sz ldavg-1 …` (example) |
+| **Equivalent** | `logman` counter collector + `relog` |
+| **Common errors** | Collection never enabled (no history when you need it) |
+| **Use case** | "It was slow at 02:00 last night." |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man1/sar.1.html> |
+
+### free -m / /proc/meminfo / PSI (/proc/pressure)
+
+| Field | Detail |
+|---|---|
+| **OS** | procps; PSI needs kernel 4.20+ (Ubuntu 24.04 yes) |
+| **Description** | `free`: memory and swap; read **available**, not free. PSI: the share of time tasks stalled waiting for CPU, memory or I/O (`some` = at least one task, `full` = all non-idle tasks). |
+| **Syntax** | `free -m` · <code>grep -E 'MemAvailable&#124;SwapFree' /proc/meminfo</code> · `cat /proc/pressure/{cpu,memory,io}` |
+| **Parameters** | PSI `avg10 avg60 avg300 total` (total in µs) |
+| **Example** | <code>free -m; grep -E 'MemAvailable&#124;Dirty' /proc/meminfo; cat /proc/pressure/io</code> |
+| **Expected output** | `full avg10=17.00 …` on the io line during the Lab 28 disk fault (captured) |
+| **Equivalent** | `\Memory\Available MBytes` · `Win32_OperatingSystem.FreePhysicalMemory` |
+| **Common errors** | Panicking about low "free" (page cache is reclaimable) |
+| **Use case** | Separating "busy" from "stalled". |
+| **Docs** | <https://man7.org/linux/man-pages/man1/free.1.html> · <https://docs.kernel.org/accounting/psi.html> |
+
+### OOM killer: dmesg -T, oom_score, choom, systemd-run -p MemoryMax=
+
+| Field | Detail |
+|---|---|
+| **OS** | util-linux `dmesg` (2.39.3; `sudo` needed on Ubuntu, `kernel.dmesg_restrict=1`) and `choom`; `systemd-run` needs systemd with cgroup v2 |
+| **Description** | Find OOM kills, read and adjust a process's OOM score, and contain a suspect program with a memory limit. |
+| **Syntax** | <code>sudo dmesg -T &#124; grep -iE 'killed process&#124;out of memory'</code> · `choom -p PID` · `choom -n ADJ -p PID` · `sudo systemd-run --scope -p MemoryMax=200M -p MemorySwapMax=0 CMD` |
+| **Parameters** | `oom_score_adj` −1000…1000 · `dmesg --since`/`--until` · a cgroup OOM kill exits the process with status 137 |
+| **Example** | `sudo journalctl -k -g 'Out of memory' --since today` |
+| **Expected output** | `Memory cgroup out of memory: Killed process 4321 (python3) …` (Day 28 Demo 5, captured under cgroup v1) |
+| **Equivalent** | System event 2004 (Resource-Exhaustion-Detector) |
+| **Common errors** | Setting `-1000` on everything · raising limits instead of fixing the leak |
+| **Use case** | "The service died at night and restarted." |
+| **Docs** | <https://man7.org/linux/man-pages/man1/dmesg.1.html> · <https://man7.org/linux/man-pages/man1/choom.1.html> · <https://man7.org/linux/man-pages/man1/systemd-run.1.html> |
+
+### strace -p / -c and /proc/PID/{wchan,stack}
+
+| Field | Detail |
+|---|---|
+| **OS** | strace (Ubuntu 24.04: 6.8); tracing another user's process needs root (Yama `ptrace_scope=1`); `/proc/PID/stack` is root-only |
+| **Description** | Show what a process is asking the kernel (`-p` live, `-c` summary) and where a sleeping process waits. |
+| **Syntax** | `sudo strace -p PID [-f] [-tt] [-T] [-e trace=SET]` · `sudo timeout -s INT 5 strace -c -f -p PID` · `ps -o pid,stat,wchan:20,args -p PID` |
+| **Parameters** | `-c` count/time per syscall · `-f` follow threads · `-T` time in each call · `-e trace=file,network` |
+| **Example** | `sudo timeout -s INT 5 strace -c -f -p 4242` |
+| **Expected output** | A table of `% time seconds usecs/call calls errors syscall` (Day 28 Demo 7, captured) |
+| **Equivalent** | Resource Monitor → *Analyze Wait Chain* · WPR/WPA |
+| **Common errors** | Leaving strace attached on production (it slows the process) |
+| **Use case** | A hung process with no logs. |
+| **Docs** | <https://man7.org/linux/man-pages/man1/strace.1.html> · <https://man7.org/linux/man-pages/man5/proc_pid_stack.5.html> |
+
+### File-descriptor leaks: /proc/PID/fd, limits, lsof -p
+
+| Field | Detail |
+|---|---|
+| **OS** | procfs, lsof (4.95) |
+| **Description** | Count a process's open descriptors against its limit; a leak ends in `EMFILE` "Too many open files". |
+| **Syntax** | <code>sudo ls /proc/PID/fd &#124; wc -l</code> · `grep 'open files' /proc/PID/limits` · `sudo lsof -p PID` · `cat /proc/sys/fs/file-nr` |
+| **Parameters** | Soft/hard limit (`ulimit -n`, `LimitNOFILE=` in a unit) |
+| **Example** | <code>sudo lsof -p 4242 &#124; awk '{print $5}' &#124; sort &#124; uniq -c</code> |
+| **Expected output** | `256` descriptors at a limit of `256` (Day 28 Demo 6, captured) |
+| **Equivalent** | `(Get-Process -Id PID).HandleCount` |
+| **Common errors** | Raising the limit without fixing the leak |
+| **Use case** | Services that fail after days of uptime. |
+| **Docs** | <https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html> · <https://man7.org/linux/man-pages/man8/lsof.8.html> |
+
+### iotop-c / df -i / du --inodes
+
+| Field | Detail |
+|---|---|
+| **OS** | `iotop-c` (universe, root; delay columns need `kernel.task_delayacct=1`); coreutils |
+| **Description** | Per-process disk I/O; inode usage per filesystem and per directory. |
+| **Syntax** | `sudo iotop-c -o` · `df -i` · `sudo du --inodes -x -d 2 / 2>/dev/null` |
+| **Parameters** | `-o` only processes doing I/O · `-x` stay on one filesystem |
+| **Example** | `df -i /srv` |
+| **Expected output** | `IUse% 100%` while `df -h` shows free space (Day 28 Demo 8, captured) |
+| **Equivalent** | `\Process(*)\IO Write Bytes/sec` · NTFS has no fixed inode table |
+| **Common errors** | "No space left" with free blocks = inodes |
+| **Use case** | Millions of small session or cache files. |
+| **Docs** | <https://manpages.ubuntu.com/manpages/noble/man8/iotop-c.8.html> · <https://man7.org/linux/man-pages/man1/df.1.html> |
+
+### ss -s / ss -lnt / nstat ListenOverflows (accept queue)
+
+| Field | Detail |
+|---|---|
+| **OS** | iproute2 |
+| **Description** | Socket summary and listen-queue health: for LISTEN sockets `Recv-Q` is the current accept queue and `Send-Q` the backlog limit. |
+| **Syntax** | `ss -s` · `ss -lnt` · `nstat -az TcpExtListenOverflows TcpExtListenDrops` |
+| **Parameters** | Overflow counters rise when the application does not `accept()` fast enough |
+| **Example** | `ss -lnt 'sport = :8080'` |
+| **Expected output** | `LISTEN 5 4 …:8080` and `TcpExtListenOverflows 15` (Day 28 Demo 9, captured) |
+| **Equivalent** | `Get-NetTCPConnection -State Listen` (no queue depth) |
+| **Common errors** | Blaming the network for SYNs the server dropped |
+| **Use case** | Connection timeouts under load with a healthy network. |
+| **Docs** | <https://man7.org/linux/man-pages/man8/ss.8.html> · <https://man7.org/linux/man-pages/man8/nstat.8.html> |
